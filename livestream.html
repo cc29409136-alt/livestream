@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>直播統籌系統</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0;}
 body{font-family:'Segoe UI',system-ui,sans-serif;background:#f5f0e8;color:#2d2520;min-height:100vh;}
@@ -1657,13 +1658,28 @@ async function handleScheduleFile(file) {
       status.textContent = '❌ PDF 讀取失敗：' + err.message;
     }
   } else if (file.type.startsWith('image/')) {
-    // ── 圖片模式：顯示預覽，提示手動輸入 ──
+    // ── 圖片模式：OCR 自動辨識文字 ──
     const reader = new FileReader();
-    reader.onload = e => {
+    reader.onload = async e => {
       imgEl.src = e.target.result;
       imgWrap.style.display = 'block';
-      status.textContent = `✅ 圖片已載入｜${file.name}（請對照圖片手動填寫場次）`;
-      toast('ok','圖片已顯示，請對照圖片填寫場次');
+      status.textContent = '⏳ 圖片 OCR 辨識中，請稍候…（可能需要 10-30 秒）';
+      try {
+        const result = await Tesseract.recognize(e.target.result, 'chi_tra+eng', {
+          logger: m => {
+            if (m.status === 'recognizing text') {
+              status.textContent = `⏳ OCR 辨識中 ${Math.round(m.progress * 100)}%…`;
+            }
+          }
+        });
+        const text = result.data.text;
+        status.textContent = `✅ OCR 完成｜${file.name}`;
+        parseScheduleText(text);
+        toast('ok','圖片辨識完成，請確認場次後匯入');
+      } catch(err) {
+        status.textContent = '❌ OCR 失敗：' + err.message;
+        toast('error','圖片辨識失敗，請改用 PDF 上傳');
+      }
     };
     reader.readAsDataURL(file);
   } else {
