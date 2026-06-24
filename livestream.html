@@ -496,14 +496,19 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:#f5f0e8;color:#2d252
 
     <!-- PDF 匯入檔期 -->
     <div class="card" style="border-color:#c0b0e0;background:#faf8ff;margin-bottom:14px;">
-      <div class="card-title" style="color:#6040a0;">📄 從 PDF 匯入每月直播檔期</div>
-      <p style="font-size:11px;color:#9c8470;margin-bottom:12px;">上傳品牌直播標單 PDF，系統自動辨識場次並新增至行事曆。</p>
+      <div class="card-title" style="color:#6040a0;">📄 從 PDF／圖片 匯入每月直播檔期</div>
+      <p style="font-size:11px;color:#9c8470;margin-bottom:12px;">上傳品牌直播標單 PDF 或圖片（JPG / PNG），系統自動辨識場次並新增至行事曆。</p>
       <div class="upload-zone" id="schedule-pdf-zone"
         ondragover="event.preventDefault();this.classList.add('drag')"
         ondragleave="this.classList.remove('drag')"
-        ondrop="this.classList.remove('drag');handleSchedulePdf(event.dataTransfer.files[0])">
-        <input type="file" accept=".pdf" onchange="handleSchedulePdf(this.files[0])" style="position:absolute;inset:0;opacity:0;cursor:pointer;">
-        <div class="upload-zone-label">📅 拖放直播檔期 PDF 或點擊上傳</div>
+        ondrop="this.classList.remove('drag');handleScheduleFile(event.dataTransfer.files[0])">
+        <input type="file" accept=".pdf,image/*" onchange="handleScheduleFile(this.files[0])" style="position:absolute;inset:0;opacity:0;cursor:pointer;">
+        <div class="upload-zone-label">📅 拖放直播檔期 PDF 或圖片（JPG / PNG）</div>
+      </div>
+      <!-- 圖片預覽 -->
+      <div id="schedule-img-preview" style="display:none;margin-top:10px;">
+        <img id="schedule-img-el" style="max-width:100%;border-radius:8px;border:1.5px solid #e0d4c4;" alt="上傳圖片">
+        <p style="font-size:10px;color:#b09880;margin-top:6px;">圖片已上傳。請在下方手動填入場次資料，或使用「➕ 新增直播場次」逐筆輸入。</p>
       </div>
       <div id="schedule-pdf-status" style="font-size:11px;color:#9c8470;margin-top:8px;min-height:16px;"></div>
       <div id="schedule-pdf-preview" style="margin-top:10px;display:none;">
@@ -1625,26 +1630,45 @@ function parsePdfSchedule(text) {
 // ══════════════════════════════════════════════
 let parsedScheduleSessions = [];
 
-async function handleSchedulePdf(file) {
-  if (!file || file.type !== 'application/pdf') { toast('error','請上傳 PDF 檔案'); return; }
+async function handleScheduleFile(file) {
+  if (!file) return;
   const status  = document.getElementById('schedule-pdf-status');
   const preview = document.getElementById('schedule-pdf-preview');
+  const imgWrap = document.getElementById('schedule-img-preview');
+  const imgEl   = document.getElementById('schedule-img-el');
   status.textContent = '⏳ 讀取中…';
   preview.style.display = 'none';
-  try {
-    const arrayBuf = await file.arrayBuffer();
-    const pdf      = await pdfjsLib.getDocument({data: arrayBuf}).promise;
-    let fullText = '';
-    for (let i = 1; i <= pdf.numPages; i++) {
-      const page    = await pdf.getPage(i);
-      const content = await page.getTextContent();
-      // 保留位置資訊以利逐行解析
-      fullText += content.items.map(it => it.str).join(' ') + '\n';
+  imgWrap.style.display = 'none';
+
+  if (file.type === 'application/pdf') {
+    // ── PDF 模式 ──
+    try {
+      const arrayBuf = await file.arrayBuffer();
+      const pdf      = await pdfjsLib.getDocument({data: arrayBuf}).promise;
+      let fullText = '';
+      for (let i = 1; i <= pdf.numPages; i++) {
+        const page    = await pdf.getPage(i);
+        const content = await page.getTextContent();
+        fullText += content.items.map(it => it.str).join(' ') + '\n';
+      }
+      status.textContent = `✅ 已讀取 ${pdf.numPages} 頁｜${file.name}`;
+      parseScheduleText(fullText);
+    } catch(err) {
+      status.textContent = '❌ PDF 讀取失敗：' + err.message;
     }
-    status.textContent = `✅ 已讀取 ${pdf.numPages} 頁｜${file.name}`;
-    parseScheduleText(fullText);
-  } catch(err) {
-    status.textContent = '❌ 讀取失敗：' + err.message;
+  } else if (file.type.startsWith('image/')) {
+    // ── 圖片模式：顯示預覽，提示手動輸入 ──
+    const reader = new FileReader();
+    reader.onload = e => {
+      imgEl.src = e.target.result;
+      imgWrap.style.display = 'block';
+      status.textContent = `✅ 圖片已載入｜${file.name}（請對照圖片手動填寫場次）`;
+      toast('ok','圖片已顯示，請對照圖片填寫場次');
+    };
+    reader.readAsDataURL(file);
+  } else {
+    toast('error','僅支援 PDF 或圖片檔（JPG / PNG）');
+    status.textContent = '';
   }
 }
 
