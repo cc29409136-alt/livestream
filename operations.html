@@ -1,0 +1,1816 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Work_TRACK — 操作系統</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: 'Segoe UI', system-ui, sans-serif; background: #0a0c14; color: #e2e8f0; font-size: 13px; min-height: 100vh; }
+
+/* AUTH */
+#auth-gate { display:flex; align-items:center; justify-content:center; min-height:100vh; flex-direction:column; gap:16px; }
+#main-app { display:none; }
+
+/* TOPBAR */
+.topbar { display:flex; align-items:center; justify-content:space-between; padding:10px 16px; background:#111827; border-bottom:1px solid #1f2937; position:sticky; top:0; z-index:200; }
+.topbar-title { font-size:15px; font-weight:800; color:#7c8ef7; letter-spacing:1px; }
+.topbar-right { display:flex; align-items:center; gap:10px; }
+.logout-btn { padding:5px 12px; background:transparent; border:1px solid #374151; border-radius:6px; color:#6b7280; cursor:pointer; font-size:11px; }
+.logout-btn:hover { border-color:#f87171; color:#f87171; }
+
+/* NAV */
+.nav { display:flex; gap:4px; padding:8px 16px; background:#111827; border-bottom:1px solid #1f2937; flex-wrap:wrap; }
+.nav-btn { padding:6px 14px; border-radius:6px; border:1px solid #374151; background:transparent; color:#9ca3af; cursor:pointer; font-size:12px; font-weight:600; transition:all 0.15s; }
+.nav-btn.active, .nav-btn:hover { background:#3b5bdb; border-color:#3b5bdb; color:#fff; }
+
+/* PANELS */
+.panel { display:none; padding:16px; max-width:1400px; margin:0 auto; }
+.panel.active { display:block; }
+
+/* CARDS */
+.card { background:#111827; border:1px solid #1f2937; border-radius:10px; padding:16px; margin-bottom:12px; }
+.card-title { font-size:11px; font-weight:700; letter-spacing:0.8px; text-transform:uppercase; color:#7c8ef7; margin-bottom:12px; display:flex; align-items:center; gap:8px; }
+
+/* GRID LAYOUTS */
+.grid2 { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+.grid3 { display:grid; grid-template-columns:1fr 1fr 1fr; gap:12px; }
+.grid4 { display:grid; grid-template-columns:repeat(4,1fr); gap:10px; }
+@media(max-width:900px) { .grid2,.grid3,.grid4 { grid-template-columns:1fr; } }
+
+/* STATE MACHINE */
+.state-machine { display:flex; flex-direction:column; gap:6px; }
+.state-row { display:flex; align-items:center; gap:6px; }
+.state-box {
+  padding:10px 20px; border-radius:8px; font-size:12px; font-weight:700;
+  border:2px solid; cursor:pointer; transition:all 0.2s; text-align:center; min-width:120px;
+  position:relative;
+}
+.state-box.idle { border-color:#374151; color:#9ca3af; background:#1f2937; }
+.state-box.create { border-color:#3b5bdb44; color:#7c8ef7; background:#1e2040; }
+.state-box.betting { border-color:#f59e0b44; color:#fbbf24; background:#1f1800; }
+.state-box.racing { border-color:#22c55e44; color:#4ade80; background:#0f1f0f; }
+.state-box.settle { border-color:#a78bfa44; color:#a78bfa; background:#1a1030; }
+.state-box.error { border-color:#f87171; color:#f87171; background:#1f0f0f; animation:pulse 1.5s infinite; }
+.state-box.ACTIVE { box-shadow:0 0 0 3px currentColor; transform:scale(1.05); }
+.state-arrow { color:#4b5563; font-size:18px; flex-shrink:0; }
+.state-time { font-size:9px; opacity:0.6; margin-top:2px; }
+
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.6} }
+
+/* STEP FLOW (防呆) */
+.flow-steps { display:flex; flex-direction:column; gap:8px; }
+.flow-step {
+  display:flex; align-items:flex-start; gap:12px;
+  padding:12px 16px; border-radius:8px;
+  border:1.5px solid #1f2937; background:#0f1117;
+  transition:all 0.2s; position:relative; overflow:hidden;
+}
+.flow-step.locked { opacity:0.4; cursor:not-allowed; }
+.flow-step.unlocked { border-color:#3b5bdb44; cursor:pointer; }
+.flow-step.unlocked:hover { border-color:#3b5bdb; background:#0f1420; }
+.flow-step.done { border-color:#22c55e44; background:#0a160a; cursor:pointer; }
+.flow-step.current { border-color:#f59e0b; background:#120f00; }
+.flow-step.current::before { content:''; position:absolute; left:0; top:0; bottom:0; width:3px; background:#f59e0b; }
+.flow-step.error-state { border-color:#f87171; background:#150808; }
+
+.step-icon { width:32px; height:32px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:13px; font-weight:700; flex-shrink:0; }
+.step-icon.locked-icon { background:#1f2937; color:#6b7280; }
+.step-icon.unlocked-icon { background:#3b5bdb22; color:#7c8ef7; }
+.step-icon.done-icon { background:#22c55e; color:#fff; }
+.step-icon.current-icon { background:#f59e0b; color:#fff; }
+
+.step-content { flex:1; }
+.step-title { font-size:13px; font-weight:700; color:#e2e8f0; }
+.step-desc { font-size:11px; color:#6b7280; margin-top:2px; }
+.step-warn { font-size:11px; color:#f59e0b; margin-top:4px; display:none; }
+.flow-step.current .step-warn { display:block; }
+
+.step-badge { font-size:10px; padding:2px 8px; border-radius:10px; margin-left:8px; font-weight:600; }
+.badge-auto { background:#3b5bdb22; color:#7c8ef7; }
+.badge-manual { background:#f59e0b22; color:#fbbf24; }
+.badge-check { background:#22c55e22; color:#4ade80; }
+
+/* PROGRESS */
+.prog-wrap { height:6px; background:#1f2937; border-radius:3px; margin:8px 0; overflow:hidden; }
+.prog-bar { height:100%; border-radius:3px; transition:width 0.4s; background:linear-gradient(90deg,#3b5bdb,#7c8ef7); }
+
+/* ALERT BOX */
+.alert { padding:10px 14px; border-radius:8px; margin-bottom:10px; font-size:12px; display:flex; align-items:center; gap:8px; }
+.alert-warn { background:#1f1800; border:1px solid #f59e0b44; color:#fbbf24; }
+.alert-error { background:#1f0808; border:1px solid #f87171; color:#f87171; animation:pulse 2s infinite; }
+.alert-ok { background:#0a1a0a; border:1px solid #22c55e44; color:#4ade80; }
+.alert-info { background:#0f1420; border:1px solid #3b5bdb44; color:#7c8ef7; }
+
+/* TABLE */
+.data-table { width:100%; border-collapse:collapse; }
+.data-table th { padding:7px 10px; text-align:left; font-size:10px; color:#6b7280; text-transform:uppercase; letter-spacing:0.5px; border-bottom:1px solid #1f2937; }
+.data-table td { padding:7px 10px; font-size:11px; color:#cbd5e1; border-bottom:1px solid #111827; }
+.data-table tr:last-child td { border-bottom:none; }
+.data-table tr:hover td { background:#0f1520; }
+.tag { display:inline-block; padding:2px 8px; border-radius:4px; font-size:10px; font-weight:600; }
+.tag-in { background:#22c55e22; color:#4ade80; }
+.tag-out { background:#3b5bdb22; color:#7c8ef7; }
+.tag-ok { background:#22c55e22; color:#4ade80; }
+.tag-error { background:#f8717122; color:#f87171; }
+
+/* EDITABLE RESPONSE */
+.resp-tag {
+  display:inline-flex; align-items:center; gap:4px;
+  padding:3px 10px; border-radius:6px; font-size:11px; font-weight:700;
+  cursor:pointer; border:1.5px solid; transition:all 0.15s;
+  user-select:none; position:relative;
+}
+.resp-ok { background:#22c55e22; color:#4ade80; border-color:#22c55e44; }
+.resp-ok:hover { background:#22c55e33; }
+.resp-error { background:#f8717122; color:#f87171; border-color:#f87171; }
+.resp-error:hover { background:#f8717133; }
+.resp-timeout { background:#f59e0b22; color:#fbbf24; border-color:#f59e0b44; }
+.resp-timeout:hover { background:#f59e0b33; }
+.resp-custom { background:#7c8ef722; color:#a5b4fc; border-color:#7c8ef744; }
+.resp-edit-btn { font-size:9px; opacity:0.6; margin-left:2px; }
+
+.resp-popup {
+  position:absolute; top:calc(100% + 6px); left:0; z-index:300;
+  background:#1f2937; border:1px solid #374151; border-radius:8px;
+  padding:8px; display:flex; flex-direction:column; gap:4px; min-width:130px;
+  box-shadow:0 8px 24px rgba(0,0,0,0.5);
+}
+.resp-option {
+  padding:5px 10px; border-radius:5px; cursor:pointer; font-size:11px; font-weight:600;
+  border:1px solid transparent; transition:all 0.1s;
+}
+.resp-option:hover { border-color:#374151; }
+.resp-input {
+  padding:5px 8px; border-radius:5px; background:#111827; border:1px solid #374151;
+  color:#e2e8f0; font-size:11px; outline:none; margin-top:2px;
+}
+.resp-input:focus { border-color:#7c8ef7; }
+
+/* ERROR CARDS */
+.err-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(240px,1fr)); gap:10px; }
+.err-card { background:#0f1117; border:1px solid #1f2937; border-radius:8px; overflow:hidden; }
+.err-head { padding:9px 12px; font-size:11px; font-weight:700; background:#111827; border-bottom:1px solid #1f2937; display:flex; align-items:center; gap:6px; justify-content:space-between; }
+.err-body { padding:10px 12px; }
+.err-cond { font-size:10px; color:#6b7280; margin-bottom:8px; padding:4px 8px; background:#0a0c14; border-radius:4px; border-left:2px solid #f59e0b; }
+.err-steps { display:flex; flex-direction:column; gap:5px; }
+.err-step { display:flex; align-items:center; gap:8px; font-size:11px; color:#cbd5e1; }
+.err-n { width:18px; height:18px; border-radius:50%; background:#f59e0b22; color:#f59e0b; font-size:9px; font-weight:700; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+.err-btn { padding:3px 10px; border-radius:4px; border:1px solid #f59e0b44; background:transparent; color:#fbbf24; font-size:10px; cursor:pointer; transition:all 0.15s; }
+.err-btn:hover { background:#f59e0b22; }
+
+/* KPI ROW */
+.kpi-row { display:grid; grid-template-columns:repeat(auto-fill,minmax(100px,1fr)); gap:8px; margin-bottom:12px; }
+.kpi { background:#0f1117; border:1px solid #1f2937; border-radius:8px; padding:12px; text-align:center; }
+.kpi-val { font-size:20px; font-weight:700; color:#7c8ef7; }
+.kpi-label { font-size:10px; color:#4b5563; margin-top:3px; text-transform:uppercase; }
+.kpi-sub { font-size:9px; color:#374151; margin-top:2px; }
+
+/* ROUND COUNTER */
+.round-display { text-align:center; padding:20px; }
+.round-num { font-size:64px; font-weight:900; color:#7c8ef7; line-height:1; }
+.round-label { font-size:12px; color:#4b5563; margin-top:4px; }
+.round-controls { display:flex; gap:8px; justify-content:center; margin-top:12px; }
+.round-btn { padding:8px 20px; border-radius:8px; border:none; cursor:pointer; font-size:13px; font-weight:600; transition:all 0.15s; }
+.btn-start { background:#22c55e; color:#fff; }
+.btn-start:hover { background:#16a34a; }
+.btn-void { background:#f87171; color:#fff; }
+.btn-void:hover { background:#dc2626; }
+.btn-reset { background:#374151; color:#9ca3af; }
+.btn-reset:hover { background:#4b5563; }
+
+/* TIMER */
+.timer-display { font-size:48px; font-weight:900; text-align:center; font-family:monospace; }
+.timer-normal { color:#4ade80; }
+.timer-warning { color:#fbbf24; }
+.timer-danger { color:#f87171; animation:pulse 0.5s infinite; }
+
+/* CHECKLIST small */
+.check-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(150px,1fr)); gap:6px; }
+.check-item { display:flex; align-items:center; gap:8px; padding:7px 10px; background:#0f1117; border:1px solid #1f2937; border-radius:6px; cursor:pointer; user-select:none; transition:all 0.15s; }
+.check-item:hover { border-color:#3b5bdb44; }
+.check-item.checked { background:#0a160a; border-color:#22c55e44; }
+.check-dot { width:10px; height:10px; border-radius:50%; background:#1f2937; flex-shrink:0; border:1.5px solid #374151; transition:background 0.15s; }
+.check-item.checked .check-dot { background:#22c55e; }
+.check-item.checked .check-lbl { color:#86efac; text-decoration:line-through; opacity:0.7; }
+.check-lbl { font-size:12px; color:#cbd5e1; }
+
+/* NOTIFICATION TOAST */
+#toast { position:fixed; bottom:20px; right:20px; z-index:999; display:flex; flex-direction:column; gap:8px; }
+.toast-item { padding:12px 16px; border-radius:8px; font-size:12px; font-weight:600; max-width:300px; display:flex; align-items:center; gap:8px; animation:slideIn 0.3s ease; }
+.toast-warn { background:#1f1800; border:1px solid #f59e0b; color:#fbbf24; }
+.toast-ok { background:#0a1a0a; border:1px solid #22c55e; color:#4ade80; }
+.toast-error { background:#1f0808; border:1px solid #f87171; color:#f87171; }
+@keyframes slideIn { from{transform:translateX(100%);opacity:0} to{transform:translateX(0);opacity:1} }
+
+/* NETWORK TABLE */
+.net-item { display:flex; justify-content:space-between; align-items:center; padding:6px 10px; border-bottom:1px solid #111827; font-size:11px; }
+.net-item:last-child { border-bottom:none; }
+.net-ip { font-family:monospace; color:#7c8ef7; }
+.net-port { font-family:monospace; color:#fbbf24; font-size:10px; }
+.online-dot {
+  display:inline-flex; align-items:center; gap:5px;
+  padding:3px 10px; border-radius:20px; font-size:10px; font-weight:700;
+  cursor:pointer; border:1.5px solid; transition:all 0.2s; user-select:none; flex-shrink:0;
+}
+.online-dot.s-online  { background:#22c55e22; color:#4ade80; border-color:#22c55e44; }
+.online-dot.s-offline { background:#f8717122; color:#f87171; border-color:#f87171; }
+.online-dot.s-warn    { background:#f59e0b22; color:#fbbf24; border-color:#f59e0b44; }
+.dot-circle { width:7px; height:7px; border-radius:50%; flex-shrink:0; }
+.s-online .dot-circle  { background:#4ade80; }
+.s-offline .dot-circle { background:#f87171; }
+.s-warn .dot-circle    { background:#fbbf24; }
+
+/* CC TABLE */
+.cc-mini { display:grid; grid-template-columns:repeat(auto-fill,minmax(130px,1fr)); gap:4px; }
+.cc-mini-item { display:flex; align-items:center; gap:6px; padding:5px 8px; background:#0f1117; border:1px solid #1f2937; border-radius:5px; }
+.cc-mini-num { font-family:monospace; font-size:10px; font-weight:700; color:#7c8ef7; min-width:32px; }
+.cc-mini-func { font-size:10px; color:#94a3b8; }
+
+.section-hd { font-size:10px; font-weight:700; letter-spacing:0.8px; text-transform:uppercase; color:#4b5563; margin:14px 0 6px; }
+
+/* RESET */
+.reset-btn { padding:4px 12px; background:transparent; border:1px solid #374151; border-radius:6px; color:#6b7280; cursor:pointer; font-size:10px; margin-left:auto; transition:all 0.15s; }
+.reset-btn:hover { border-color:#f59e0b; color:#f59e0b; }
+
+/* MINI LOG */
+.mini-log { margin-top:8px; max-height:80px; overflow-y:auto; display:flex; flex-direction:column; gap:2px; }
+.mini-log-item { display:flex; align-items:flex-start; gap:6px; padding:3px 6px; border-radius:4px; font-size:10px; }
+.mini-log-item.auto  { background:#f8717111; border-left:2px solid #f87171; }
+.mini-log-item.manual { background:#3b5bdb11; border-left:2px solid #3b5bdb; }
+.mini-log-item.resolved { background:#22c55e11; border-left:2px solid #22c55e; opacity:0.6; }
+.mini-log-time { color:#4b5563; flex-shrink:0; }
+.mini-log-text { color:#cbd5e1; }
+.mini-log-badge { font-size:9px; padding:1px 5px; border-radius:3px; flex-shrink:0; }
+.badge-auto    { background:#f8717122; color:#f87171; }
+.badge-manual  { background:#3b5bdb22; color:#7c8ef7; }
+.badge-resolved{ background:#22c55e22; color:#4ade80; }
+
+/* RESOLVE BTN */
+.resolve-btn { margin-top:8px; padding:5px 12px; border-radius:6px; border:1px solid #22c55e44; background:#22c55e11; color:#4ade80; font-size:11px; cursor:pointer; width:100%; transition:all 0.15s; }
+.resolve-btn:hover { background:#22c55e22; }
+
+/* ERR CARD active */
+.err-card.has-error { border-color:#f87171; animation:err-pulse 2s infinite; }
+.err-card.has-warn  { border-color:#f59e0b; }
+.err-card.resolved  { border-color:#22c55e44; opacity:0.7; }
+@keyframes err-pulse { 0%,100%{box-shadow:0 0 0 0 #f8717133} 50%{box-shadow:0 0 0 6px #f8717100} }
+
+/* NAV BADGE */
+.nav-badge { display:inline-block; background:#f87171; color:#fff; border-radius:10px; padding:1px 6px; font-size:9px; font-weight:700; margin-left:4px; vertical-align:middle; }
+
+/* ALERT BANNER */
+@keyframes banner-flash { 0%,100%{background:#7f1d1d} 50%{background:#991b1b} }
+
+/* PERIOD BUTTONS */
+.period-btn { padding:6px 16px; border-radius:20px; border:1px solid #374151; background:transparent; color:#6b7280; cursor:pointer; font-size:12px; font-weight:600; transition:all 0.15s; }
+.period-btn.active, .period-btn:hover { background:#3b5bdb22; border-color:#3b5bdb; color:#7c8ef7; }
+
+/* TYPE BAR */
+.type-bar-row { display:flex; align-items:center; gap:8px; margin-bottom:5px; }
+.type-bar-label { font-size:11px; color:#94a3b8; width:110px; flex-shrink:0; }
+.type-bar-track { flex:1; height:8px; background:#1f2937; border-radius:4px; overflow:hidden; }
+.type-bar-fill { height:100%; border-radius:4px; transition:width 0.4s; }
+.type-bar-count { font-size:11px; color:#6b7280; width:28px; text-align:right; }
+
+/* RECORD ROW */
+.rec-row { transition:background 0.15s; }
+.rec-row:hover { background:#0f1520; }
+.rec-row td { padding:8px 10px; border-bottom:1px solid #111827; font-size:11px; vertical-align:middle; }
+.rec-row:last-child td { border-bottom:none; }
+.src-auto   { background:#f8717122; color:#f87171; padding:2px 7px; border-radius:4px; font-size:10px; font-weight:700; }
+.src-manual { background:#3b5bdb22; color:#7c8ef7; padding:2px 7px; border-radius:4px; font-size:10px; font-weight:700; }
+.src-admin  { background:#f59e0b22; color:#fbbf24; padding:2px 7px; border-radius:4px; font-size:10px; font-weight:700; }
+.st-open     { background:#f8717122; color:#f87171; padding:2px 7px; border-radius:4px; font-size:10px; }
+.st-resolved { background:#22c55e22; color:#4ade80; padding:2px 7px; border-radius:4px; font-size:10px; }
+.st-op       { background:#3b5bdb22; color:#7c8ef7; padding:2px 7px; border-radius:4px; font-size:10px; }
+.edit-btn { padding:3px 8px; border-radius:4px; border:1px solid #374151; background:transparent; color:#6b7280; cursor:pointer; font-size:10px; }
+.edit-btn:hover { border-color:#f59e0b; color:#f59e0b; }
+.del-btn { padding:3px 8px; border-radius:4px; border:1px solid #f8717144; background:transparent; color:#f87171; cursor:pointer; font-size:10px; }
+
+/* STAT CARD */
+.stat-card { background:#0f1117; border:1px solid #1f2937; border-radius:8px; padding:10px 12px; text-align:center; }
+.stat-val { font-size:22px; font-weight:800; }
+.stat-lbl { font-size:10px; color:#4b5563; margin-top:3px; text-transform:uppercase; }
+</style>
+</head>
+<body>
+
+<!-- AUTH -->
+<div id="auth-gate" style="background:#0a0c14;">
+  <div style="font-size:48px;">⬡</div>
+  <div style="font-size:18px;font-weight:800;color:#7c8ef7;">Work_TRACK</div>
+  <div style="display:flex;flex-direction:column;gap:10px;width:280px;margin-top:16px;">
+    <input type="text" id="uname" placeholder="您的姓名（中英文皆可）" maxlength="20"
+      style="padding:12px 14px;background:#111827;border:1px solid #374151;border-radius:8px;color:#e2e8f0;font-size:14px;outline:none;"
+      onkeydown="if(event.key==='Enter')checkAuth()">
+    <button onclick="checkAuth()"
+      style="padding:12px;background:#3b5bdb;color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;">
+      登入系統
+    </button>
+    <div id="auth-err" style="font-size:12px;color:#f87171;text-align:center;min-height:16px;"></div>
+  </div>
+</div>
+
+<!-- MAIN APP -->
+<div id="main-app">
+  <div class="topbar">
+    <span class="topbar-title">⬡ Work_TRACK — 操作系統</span>
+    <div class="topbar-right">
+      <span style="font-size:11px;color:#4b5563;" id="clock"></span>
+      <span id="topbar-user" style="font-size:11px;color:#7c8ef7;padding:4px 10px;background:#3b5bdb18;border:1px solid #3b5bdb33;border-radius:20px;"></span>
+      <span id="admin-status" onclick="openPwModal()" title="管理員可點此變更密碼"
+        style="font-size:11px;color:#4b5563;padding:4px 10px;border:1px solid #374151;border-radius:20px;cursor:default;">🔒 一般模式</span>
+      <button onclick="toggleAdmin()" id="admin-btn"
+        style="padding:5px 12px;border-radius:6px;border:1px solid #374151;background:transparent;color:#9ca3af;font-size:11px;cursor:pointer;font-weight:600;">
+        管理員登入
+      </button>
+      <button class="logout-btn" onclick="doLogout()">登出</button>
+    </div>
+  </div>
+
+  <div class="nav">
+    <button class="nav-btn active" onclick="switchTab('race',this)">🏁 賽事操作</button>
+    <button class="nav-btn" onclick="switchTab('startup',this)">🟢 開關機</button>
+    <button class="nav-btn" onclick="switchTab('state',this)">🔄 狀態機</button>
+    <button class="nav-btn" onclick="switchTab('error',this)">⚠️ 異常排除</button>
+    <button class="nav-btn" onclick="switchTab('spec',this)">📐 規格參考</button>
+    <button class="nav-btn" onclick="switchTab('records',this)" id="nav-records">📝 異常紀錄</button>
+  </div>
+
+  <!-- ===== 賽事操作 ===== -->
+  <div class="panel active" id="panel-race">
+    <div class="grid2">
+      <!-- 左：防呆流程 -->
+      <div>
+        <div class="card">
+          <div class="card-title">
+            🏁 賽事循環流程
+            <span style="font-size:10px;color:#4b5563;font-weight:400;">（依序點擊解鎖）</span>
+            <button class="reset-btn" onclick="resetRace()">重置</button>
+          </div>
+          <div class="prog-wrap"><div class="prog-bar" id="race-prog" style="width:0%"></div></div>
+          <div style="margin-bottom:10px;font-size:11px;color:#4b5563;" id="race-prog-label">進度：0 / 7 步驟</div>
+          <div class="flow-steps" id="race-steps">
+            <!-- Steps injected by JS -->
+          </div>
+        </div>
+      </div>
+
+      <!-- 右：計時器 + 回合 -->
+      <div>
+        <div class="card">
+          <div class="card-title">⏱ 計時器</div>
+          <div class="timer-display timer-normal" id="timer-display">00:00</div>
+          <div style="display:flex;gap:8px;justify-content:center;margin-top:12px;">
+            <button class="round-btn btn-start" onclick="startTimer()">開始</button>
+            <button class="round-btn btn-reset" onclick="resetTimer()">歸零</button>
+            <button class="round-btn btn-void" onclick="stopTimer()">停止</button>
+          </div>
+          <div style="display:flex;justify-content:space-between;margin-top:12px;font-size:11px;color:#4b5563;padding:0 4px;">
+            <span>Betting: 7s</span><span>Race: 20~30s</span><span>Settle: 4s</span><span>Timeout: 35s</span>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-title">🎯 回合記錄</div>
+          <div class="round-display">
+            <div class="round-num" id="round-num">1</div>
+            <div class="round-label">Round</div>
+          </div>
+          <div class="round-controls">
+            <button class="round-btn btn-start" onclick="nextRound()" style="font-size:12px;">✅ 正常結算 → 下一回合</button>
+            <button class="round-btn btn-void" onclick="voidRound()" style="font-size:12px;">❌ Void</button>
+          </div>
+          <div style="margin-top:10px;">
+            <div style="font-size:10px;color:#4b5563;margin-bottom:6px;">VOID 紀錄</div>
+            <div id="void-log" style="font-size:11px;color:#f87171;min-height:20px;"></div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-title">🎱 起跑確認</div>
+          <div id="ball-check-alert"></div>
+          <div style="display:flex;gap:10px;align-items:center;justify-content:center;padding:10px 0;">
+            <button onclick="toggleBall('blue')" id="ball-blue"
+              style="padding:10px 24px;border-radius:8px;border:2px solid #3b5bdb44;background:#0f1420;color:#7c8ef7;font-size:13px;font-weight:700;cursor:pointer;transition:all 0.2s;">
+              🔵 藍球
+            </button>
+            <button onclick="toggleBall('yellow')" id="ball-yellow"
+              style="padding:10px 24px;border-radius:8px;border:2px solid #f59e0b44;background:#120f00;color:#fbbf24;font-size:13px;font-weight:700;cursor:pointer;transition:all 0.2s;">
+              🟡 黃球
+            </button>
+          </div>
+          <div id="ball-status" style="text-align:center;font-size:12px;color:#4b5563;">需確認 1 藍 + 1 黃</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== 開關機 ===== -->
+  <div class="panel" id="panel-startup">
+    <div class="grid2">
+      <div>
+        <div class="card">
+          <div class="card-title">✅ 開機前設備確認 <button class="reset-btn" onclick="resetChecks('pre')">重置</button></div>
+          <div class="check-grid" id="pre-check">
+            <div class="check-item" onclick="chk(this,'pre')"><div class="check-dot"></div><span class="check-lbl">Main Control Server</span></div>
+            <div class="check-item" onclick="chk(this,'pre')"><div class="check-dot"></div><span class="check-lbl">Tracking Cam 01</span></div>
+            <div class="check-item" onclick="chk(this,'pre')"><div class="check-dot"></div><span class="check-lbl">Tracking Cam 02</span></div>
+            <div class="check-item" onclick="chk(this,'pre')"><div class="check-dot"></div><span class="check-lbl">Tracking Cam 03</span></div>
+            <div class="check-item" onclick="chk(this,'pre')"><div class="check-dot"></div><span class="check-lbl">Arduino Mega</span></div>
+            <div class="check-item" onclick="chk(this,'pre')"><div class="check-dot"></div><span class="check-lbl">機械手臂</span></div>
+            <div class="check-item" onclick="chk(this,'pre')"><div class="check-dot"></div><span class="check-lbl">VMIX 主機</span></div>
+            <div class="check-item" onclick="chk(this,'pre')"><div class="check-dot"></div><span class="check-lbl">PTZ Camera</span></div>
+            <div class="check-item" onclick="chk(this,'pre')"><div class="check-dot"></div><span class="check-lbl">Studio Light</span></div>
+            <div class="check-item" onclick="chk(this,'pre')"><div class="check-dot"></div><span class="check-lbl">HDMI 訊號</span></div>
+            <div class="check-item" onclick="chk(this,'pre')"><div class="check-dot"></div><span class="check-lbl">網路正常</span></div>
+          </div>
+          <div class="prog-wrap" style="margin-top:10px;"><div class="prog-bar" id="pre-prog" style="width:0%"></div></div>
+        </div>
+
+        <div class="card">
+          <div class="card-title">🟢 開機順序（依序完成）<button class="reset-btn" onclick="resetBootSteps()">重置</button></div>
+          <div class="flow-steps" id="boot-steps"></div>
+        </div>
+      </div>
+
+      <div>
+        <div class="card">
+          <div class="card-title">🎯 開賽前確認 <button class="reset-btn" onclick="resetChecks('race-pre')">重置</button></div>
+          <div class="check-grid" id="race-pre-check" style="grid-template-columns:1fr;">
+            <div class="check-item" onclick="chk(this,'race-pre')"><div class="check-dot"></div><span class="check-lbl">起點：藍球 1 顆</span></div>
+            <div class="check-item" onclick="chk(this,'race-pre')"><div class="check-dot"></div><span class="check-lbl">起點：黃球 1 顆</span></div>
+            <div class="check-item" onclick="chk(this,'race-pre')"><div class="check-dot"></div><span class="check-lbl">終點：0 顆</span></div>
+            <div class="check-item" onclick="chk(this,'race-pre')"><div class="check-dot"></div><span class="check-lbl">Leaderboard 無異物</span></div>
+            <div class="check-item" onclick="chk(this,'race-pre')"><div class="check-dot"></div><span class="check-lbl">漏斗無卡珠</span></div>
+          </div>
+          <div class="prog-wrap" style="margin-top:10px;"><div class="prog-bar" id="race-pre-prog" style="width:0%"></div></div>
+        </div>
+
+        <div class="card">
+          <div class="card-title">🔴 關機流程（依序完成）<button class="reset-btn" onclick="resetShutSteps()">重置</button></div>
+          <div class="flow-steps" id="shut-steps"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== 狀態機 ===== -->
+  <div class="panel" id="panel-state">
+    <div class="grid2">
+      <div>
+        <div class="card">
+          <div class="card-title">🔄 系統狀態機</div>
+          <div style="display:flex;flex-direction:column;gap:10px;align-items:center;padding:10px 0;">
+            <div class="state-box idle" id="st-idle" onclick="setState('idle')">IDLE<div class="state-time">待機</div></div>
+            <div class="state-arrow">↓</div>
+            <div class="state-box create" id="st-create" onclick="setState('create')">CREATE<div class="state-time">5s</div></div>
+            <div class="state-arrow">↓</div>
+            <div class="state-box betting" id="st-betting" onclick="setState('betting')">BETTING<div class="state-time">7s</div></div>
+            <div class="state-arrow">↓</div>
+            <div class="state-box racing" id="st-racing" onclick="setState('racing')">RACING<div class="state-time">20~30s</div></div>
+            <div class="state-arrow">↓</div>
+            <div class="state-box settle" id="st-settle" onclick="setState('settle')">SETTLE<div class="state-time">4s</div></div>
+            <div class="state-arrow">↓ (Next Round)</div>
+          </div>
+          <div style="margin-top:10px;">
+            <div class="state-box error" id="st-error" onclick="setState('error')" style="width:100%;text-align:center;">
+              ⚠ ERROR STATE — 點擊進入錯誤模式
+            </div>
+          </div>
+          <div style="margin-top:12px;font-size:11px;color:#4b5563;">
+            目前狀態：<span id="current-state-label" style="color:#7c8ef7;font-weight:700;">IDLE</span>
+          </div>
+        </div>
+      </div>
+
+      <div>
+        <div class="card">
+          <div class="card-title">📊 KPI 時間規格</div>
+          <div class="kpi-row">
+            <div class="kpi"><div class="kpi-val">5s</div><div class="kpi-label">Create</div></div>
+            <div class="kpi"><div class="kpi-val">7s</div><div class="kpi-label">Betting</div></div>
+            <div class="kpi"><div class="kpi-val">20~30s</div><div class="kpi-label">Race</div></div>
+            <div class="kpi"><div class="kpi-val">4s</div><div class="kpi-label">Settle</div></div>
+            <div class="kpi"><div class="kpi-val">35s</div><div class="kpi-label">Timeout</div></div>
+            <div class="kpi"><div class="kpi-val">5×</div><div class="kpi-label">Max Retry</div></div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-title">📡 Slack 告警事件</div>
+          <div style="display:flex;flex-wrap:wrap;gap:6px;">
+            <span style="padding:5px 12px;border-radius:20px;border:1px solid #f59e0b44;background:#1f1800;color:#fbbf24;font-size:11px;font-weight:600;">Failed To Retrieve</span>
+            <span style="padding:5px 12px;border-radius:20px;border:1px solid #f59e0b44;background:#1f1800;color:#fbbf24;font-size:11px;font-weight:600;">Ball Color Error</span>
+            <span style="padding:5px 12px;border-radius:20px;border:1px solid #f59e0b44;background:#1f1800;color:#fbbf24;font-size:11px;font-weight:600;">Timeout</span>
+            <span style="padding:5px 12px;border-radius:20px;border:1px solid #f59e0b44;background:#1f1800;color:#fbbf24;font-size:11px;font-weight:600;">Camera Offline</span>
+            <span style="padding:5px 12px;border-radius:20px;border:1px solid #f87171;background:#1f0808;color:#f87171;font-size:11px;font-weight:600;">HDMI Lost</span>
+            <span style="padding:5px 12px;border-radius:20px;border:1px solid #f87171;background:#1f0808;color:#f87171;font-size:11px;font-weight:600;">Arm Error</span>
+            <span style="padding:5px 12px;border-radius:20px;border:1px solid #f87171;background:#1f0808;color:#f87171;font-size:11px;font-weight:600;">Manual Intervention Required</span>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-title">🔀 異常流程路徑</div>
+          <div style="font-size:11px;color:#94a3b8;line-height:2;">
+            <div>Health Fail → Retry → <span style="color:#fbbf24;">Retry &lt; 5</span> 繼續 ／ <span style="color:#f87171;">≥ 5 → Error Mode</span></div>
+            <div>Timeout 35s → <span style="color:#f87171;">Void Round</span> → Slack → Manual Fix → Next Round</div>
+            <div>Ball Error → <span style="color:#f87171;">Void Round</span> → Slack → Manual Fix → Next Round</div>
+            <div>Camera Offline → <span style="color:#f87171;">Error Mode</span> → Manual Restart</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 強烈警示 Banner -->
+  <!-- 密碼變更 Modal -->
+  <div id="pw-modal" style="display:none;position:fixed;inset:0;z-index:800;background:#00000088;align-items:center;justify-content:center;">
+    <div style="background:#1a1d27;border:1px solid #f59e0b44;border-radius:14px;padding:28px 32px;width:360px;max-width:90vw;">
+      <div style="font-size:14px;font-weight:800;color:#fbbf24;margin-bottom:18px;">🔑 變更管理員密碼</div>
+      <div style="font-size:10px;color:#6b7280;margin-bottom:4px;">目前密碼</div>
+      <input type="password" id="pw-admin-old" placeholder="輸入目前管理員密碼"
+        style="width:100%;padding:10px;background:#0f1117;border:1px solid #374151;border-radius:8px;color:#e2e8f0;font-size:13px;outline:none;margin-bottom:12px;">
+      <div style="font-size:10px;color:#6b7280;margin-bottom:4px;">新密碼</div>
+      <input type="password" id="pw-admin-new" placeholder="輸入新管理員密碼"
+        style="width:100%;padding:10px;background:#0f1117;border:1px solid #374151;border-radius:8px;color:#e2e8f0;font-size:13px;outline:none;margin-bottom:12px;">
+      <div style="font-size:10px;color:#6b7280;margin-bottom:4px;">確認新密碼</div>
+      <input type="password" id="pw-admin-confirm" placeholder="再輸入一次新密碼"
+        style="width:100%;padding:10px;background:#0f1117;border:1px solid #374151;border-radius:8px;color:#e2e8f0;font-size:13px;outline:none;margin-bottom:16px;"
+        onkeydown="if(event.key==='Enter')changeAdminPw()">
+      <div style="display:flex;gap:8px;">
+        <button onclick="changeAdminPw()"
+          style="flex:1;padding:10px;background:#6366f1;color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;">
+          確認變更
+        </button>
+        <button onclick="closePwModal()"
+          style="padding:10px 16px;background:transparent;border:1px solid #374151;border-radius:8px;color:#6b7280;font-size:13px;cursor:pointer;">
+          取消
+        </button>
+      </div>
+      <div id="pw-admin-msg" style="font-size:11px;min-height:16px;margin-top:10px;text-align:center;"></div>
+      <div style="font-size:10px;color:#374151;margin-top:12px;border-top:1px solid #1f2937;padding-top:10px;line-height:1.7;">
+        密碼儲存於本機瀏覽器。清除瀏覽器資料後還原預設值 <span style="color:#f59e0b;font-family:monospace;">adminadmin0000</span>
+      </div>
+    </div>
+  </div>
+
+  <div id="alert-banner" style="display:none; position:fixed; top:0; left:0; right:0; z-index:500;
+    background:#7f1d1d; border-bottom:3px solid #f87171; padding:12px 20px;
+    display:none; align-items:center; justify-content:space-between; gap:12px;">
+    <div style="display:flex;align-items:center;gap:10px;">
+      <span style="font-size:20px;animation:pulse 0.6s infinite;">🚨</span>
+      <div>
+        <div style="font-size:13px;font-weight:800;color:#fca5a5;" id="banner-title">異常警示</div>
+        <div style="font-size:11px;color:#f87171;" id="banner-msg"></div>
+      </div>
+    </div>
+    <div style="display:flex;gap:8px;">
+      <button onclick="switchToError()" style="padding:6px 14px;background:#ef4444;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:12px;font-weight:700;">前往排除</button>
+      <button onclick="closeBanner()" style="padding:6px 14px;background:transparent;color:#fca5a5;border:1px solid #f87171;border-radius:6px;cursor:pointer;font-size:12px;">確認知道</button>
+    </div>
+  </div>
+
+  <!-- ===== 異常排除 ===== -->
+  <div class="panel" id="panel-error">
+
+    <!-- 統計列 -->
+    <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;" id="err-stat-row">
+      <div style="padding:6px 14px;border-radius:20px;background:#1f2937;border:1px solid #374151;font-size:11px;color:#9ca3af;">
+        總計異常：<span id="err-total" style="color:#f87171;font-weight:700;">0</span>
+      </div>
+      <div style="padding:6px 14px;border-radius:20px;background:#1f2937;border:1px solid #374151;font-size:11px;color:#9ca3af;">
+        未解決：<span id="err-open" style="color:#fbbf24;font-weight:700;">0</span>
+      </div>
+    </div>
+
+    <div class="err-grid" id="err-cards-container">
+
+      <!-- 🚦 起跑錯誤 -->
+      <div class="err-card" id="ec-start">
+        <div class="err-head" style="color:#f87171;">
+          <span>🚦 起跑錯誤</span>
+          <div style="display:flex;gap:4px;">
+            <button class="err-btn" style="background:#f8717122;border-color:#f87171;" onclick="triggerAlert('start','🚦 起跑錯誤','彈珠顏色錯誤，系統需暫停處理','error')">🚨 自動觸發</button>
+            <button class="err-btn" onclick="manualLog('start','🚦 起跑錯誤')">📝 手動記錄</button>
+          </div>
+        </div>
+        <div class="err-body">
+          <div class="err-cond">條件：非 1 Blue + 1 Yellow</div>
+          <div class="err-steps">
+            <div class="err-step"><div class="err-n">1</div>系統暫停</div>
+            <div class="err-step"><div class="err-n">2</div>整理起點彈珠</div>
+            <div class="err-step"><div class="err-n">3</div>確認 1藍 + 1黃</div>
+            <div class="err-step"><div class="err-n">4</div>重新開始</div>
+          </div>
+          <div class="mini-log" id="log-start"></div>
+          <button class="resolve-btn" onclick="resolveErr('start')" style="display:none;" id="resolve-start">✅ 標記已解決</button>
+        </div>
+      </div>
+
+      <!-- ♻️ 回收失敗 -->
+      <div class="err-card" id="ec-collect">
+        <div class="err-head" style="color:#fbbf24;">
+          <span>♻️ 回收失敗</span>
+          <div style="display:flex;gap:4px;">
+            <button class="err-btn" style="background:#f59e0b22;border-color:#f59e0b;" onclick="triggerAlert('collect','♻️ 回收失敗','Retry 5次失敗，需手動BC','warn')">🚨 自動觸發</button>
+            <button class="err-btn" onclick="manualLog('collect','♻️ 回收失敗')">📝 手動記錄</button>
+          </div>
+        </div>
+        <div class="err-body">
+          <div class="err-cond">條件：Retry 5 次失敗</div>
+          <div class="err-steps">
+            <div class="err-step"><div class="err-n">1</div>檢查終點</div>
+            <div class="err-step"><div class="err-n">2</div>手動 BC 指令</div>
+            <div class="err-step"><div class="err-n">3</div>確認回收完成</div>
+            <div class="err-step"><div class="err-n">4</div>Restart Loop</div>
+          </div>
+          <div class="mini-log" id="log-collect"></div>
+          <button class="resolve-btn" onclick="resolveErr('collect')" style="display:none;" id="resolve-collect">✅ 標記已解決</button>
+        </div>
+      </div>
+
+      <!-- 📺 HDMI 消失 -->
+      <div class="err-card" id="ec-hdmi">
+        <div class="err-head" style="color:#a78bfa;">
+          <span>📺 HDMI 消失</span>
+          <div style="display:flex;gap:4px;">
+            <button class="err-btn" style="background:#f8717122;border-color:#f87171;" onclick="triggerAlert('hdmi','📺 HDMI 消失','畫面訊號中斷，直播已中斷！','error')">🚨 自動觸發</button>
+            <button class="err-btn" onclick="manualLog('hdmi','📺 HDMI 消失')">📝 手動記錄</button>
+          </div>
+        </div>
+        <div class="err-body">
+          <div class="err-cond">條件：畫面中斷</div>
+          <div class="err-steps">
+            <div class="err-step"><div class="err-n">1</div>檢查 HDMI 線材</div>
+            <div class="err-step"><div class="err-n">2</div>重插 HDMI</div>
+            <div class="err-step"><div class="err-n">3</div>重開 Camera</div>
+            <div class="err-step"><div class="err-n">4</div>重開 VMIX</div>
+          </div>
+          <div class="mini-log" id="log-hdmi"></div>
+          <button class="resolve-btn" onclick="resolveErr('hdmi')" style="display:none;" id="resolve-hdmi">✅ 標記已解決</button>
+        </div>
+      </div>
+
+      <!-- 🦾 手臂失控 -->
+      <div class="err-card" id="ec-arm">
+        <div class="err-head" style="color:#f472b6;">
+          <span>🦾 手臂失控</span>
+          <div style="display:flex;gap:4px;">
+            <button class="err-btn" style="background:#f8717122;border-color:#f87171;" onclick="triggerAlert('arm','🦾 手臂失控','緊急停止！手臂異常動作','error')">🚨 緊急停止</button>
+            <button class="err-btn" onclick="manualLog('arm','🦾 手臂失控')">📝 手動記錄</button>
+          </div>
+        </div>
+        <div class="err-body">
+          <div class="err-cond">條件：手臂異常動作</div>
+          <div class="err-steps">
+            <div class="err-step"><div class="err-n">1</div>Emergency Stop</div>
+            <div class="err-step"><div class="err-n">2</div>關閉 Servo</div>
+            <div class="err-step"><div class="err-n">3</div>確認 Home Position</div>
+            <div class="err-step"><div class="err-n">4</div>Reload Preset</div>
+            <div class="err-step"><div class="err-n">5</div>Restart Arm</div>
+          </div>
+          <div class="mini-log" id="log-arm"></div>
+          <button class="resolve-btn" onclick="resolveErr('arm')" style="display:none;" id="resolve-arm">✅ 標記已解決</button>
+        </div>
+      </div>
+
+      <!-- 📷 Camera Offline -->
+      <div class="err-card" id="ec-cam">
+        <div class="err-head" style="color:#22d3ee;">
+          <span>📷 Camera Offline</span>
+          <div style="display:flex;gap:4px;">
+            <button class="err-btn" style="background:#f8717122;border-color:#f87171;" onclick="triggerAlert('cam','📷 Camera Offline','攝影機離線，追蹤系統中斷！','error')">🚨 自動觸發</button>
+            <button class="err-btn" onclick="manualLog('cam','📷 Camera Offline')">📝 手動記錄</button>
+          </div>
+        </div>
+        <div class="err-body">
+          <div class="err-cond">條件：Camera Service 異常</div>
+          <div class="err-steps">
+            <div class="err-step"><div class="err-n">1</div>確認網路連線</div>
+            <div class="err-step"><div class="err-n">2</div>重啟 Camera Service</div>
+            <div class="err-step"><div class="err-n">3</div>確認畫面恢復</div>
+            <div class="err-step"><div class="err-n">4</div>重新啟動 Loop</div>
+          </div>
+          <div class="mini-log" id="log-cam"></div>
+          <button class="resolve-btn" onclick="resolveErr('cam')" style="display:none;" id="resolve-cam">✅ 標記已解決</button>
+        </div>
+      </div>
+
+      <!-- ⏱ Timeout -->
+      <div class="err-card" id="ec-timeout">
+        <div class="err-head" style="color:#fbbf24;">
+          <span>⏱ Timeout</span>
+          <div style="display:flex;gap:4px;">
+            <button class="err-btn" style="background:#f59e0b22;border-color:#f59e0b;" onclick="triggerAlert('timeout','⏱ Timeout','超過35秒！執行Void Round','warn');voidRound()">🚨 Void+記錄</button>
+            <button class="err-btn" onclick="manualLog('timeout','⏱ Timeout')">📝 手動記錄</button>
+          </div>
+        </div>
+        <div class="err-body">
+          <div class="err-cond">條件：超過 35 秒未完賽</div>
+          <div class="err-steps">
+            <div class="err-step"><div class="err-n">1</div>Void Round</div>
+            <div class="err-step"><div class="err-n">2</div>Slack 通知</div>
+            <div class="err-step"><div class="err-n">3</div>Manual Fix</div>
+            <div class="err-step"><div class="err-n">4</div>繼續下一回合</div>
+          </div>
+          <div class="mini-log" id="log-timeout"></div>
+          <button class="resolve-btn" onclick="resolveErr('timeout')" style="display:none;" id="resolve-timeout">✅ 標記已解決</button>
+        </div>
+      </div>
+
+    </div><!-- /err-grid -->
+
+    <!-- 手動記錄輸入 -->
+    <div class="card" style="margin-top:12px;" id="manual-input-card" style="display:none;">
+      <div class="card-title">📝 手動記錄輸入</div>
+      <div style="display:flex;gap:8px;align-items:center;">
+        <select id="manual-type" style="padding:8px 12px;background:#0f1117;border:1px solid #374151;border-radius:6px;color:#e2e8f0;font-size:12px;">
+          <option value="start">🚦 起跑錯誤</option>
+          <option value="collect">♻️ 回收失敗</option>
+          <option value="hdmi">📺 HDMI 消失</option>
+          <option value="arm">🦾 手臂失控</option>
+          <option value="cam">📷 Camera Offline</option>
+          <option value="timeout">⏱ Timeout</option>
+        </select>
+        <input id="manual-note" placeholder="備註說明（選填）"
+          style="flex:1;padding:8px 12px;background:#0f1117;border:1px solid #374151;border-radius:6px;color:#e2e8f0;font-size:12px;outline:none;"
+          onkeydown="if(event.key==='Enter')submitManual()">
+        <button onclick="submitManual()" style="padding:8px 16px;background:#3b5bdb;color:#fff;border:none;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;">記錄</button>
+      </div>
+    </div>
+
+    <!-- 彙總紀錄 -->
+    <div class="card" style="margin-top:10px;">
+      <div class="card-title">
+        📋 異常彙總紀錄
+        <span id="err-total-badge" style="font-size:10px;background:#f8717122;color:#f87171;padding:2px 8px;border-radius:10px;margin-left:6px;display:none;">0</span>
+        <button id="admin-clear-log-btn" onclick="adminClearErrorLog()"
+          style="display:none;margin-left:auto;padding:3px 10px;border-radius:6px;border:1px solid #f8717144;background:transparent;color:#f87171;font-size:10px;cursor:pointer;">
+          🗑 管理員清除
+        </button>
+      </div>
+      <div id="error-log" style="font-size:11px;color:#6b7280;min-height:40px;max-height:260px;overflow-y:auto;">尚無異常紀錄</div>
+    </div>
+  </div>
+
+  <!-- ===== 異常紀錄 ===== -->
+  <div class="panel" id="panel-records">
+
+    <!-- 管理員列 -->
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;flex-wrap:wrap;">
+      <div style="font-size:13px;font-weight:700;color:#7c8ef7;">📝 永久異常紀錄</div>
+      <div style="font-size:11px;color:#4b5563;">所有紀錄自動儲存，重整不消失</div>
+      <div style="margin-left:auto;display:flex;gap:8px;align-items:center;">
+        <button onclick="exportCSV()"
+          style="padding:6px 14px;border-radius:6px;border:1px solid #3b5bdb44;background:#3b5bdb11;color:#7c8ef7;font-size:11px;cursor:pointer;">
+          ⬇ 匯出 CSV
+        </button>
+      </div>
+    </div>
+
+    <!-- 期間切換 + 統計 -->
+    <div class="card" style="margin-bottom:12px;">
+      <div style="display:flex;gap:6px;margin-bottom:14px;flex-wrap:wrap;align-items:center;">
+        <button class="period-btn active" onclick="setPeriod('day',this)">📅 今日</button>
+        <button class="period-btn" onclick="setPeriod('week',this)">📆 本週</button>
+        <button class="period-btn" onclick="setPeriod('month',this)">🗓 本月</button>
+        <button class="period-btn" onclick="setPeriod('all',this)">📋 全部</button>
+        <span style="font-size:11px;color:#4b5563;margin-left:auto;" id="period-label">今日</span>
+      </div>
+
+      <!-- 統計卡 -->
+      <div id="stat-cards" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:8px;margin-bottom:14px;"></div>
+
+      <!-- 類型分布 -->
+      <div style="margin-bottom:10px;">
+        <div style="font-size:10px;color:#4b5563;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px;">異常類型分布</div>
+        <div id="type-bars"></div>
+      </div>
+    </div>
+
+    <!-- 紀錄篩選列 -->
+    <div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap;align-items:center;">
+      <select id="filter-type" onchange="renderRecords()"
+        style="padding:6px 10px;background:#111827;border:1px solid #374151;border-radius:6px;color:#e2e8f0;font-size:11px;">
+        <option value="">全部類型</option>
+        <option value="start">🚦 起跑錯誤</option>
+        <option value="collect">♻️ 回收失敗</option>
+        <option value="hdmi">📺 HDMI 消失</option>
+        <option value="arm">🦾 手臂失控</option>
+        <option value="cam">📷 Camera Offline</option>
+        <option value="timeout">⏱ Timeout</option>
+        <option value="op">📋 操作記錄</option>
+      </select>
+      <select id="filter-source" onchange="renderRecords()"
+        style="padding:6px 10px;background:#111827;border:1px solid #374151;border-radius:6px;color:#e2e8f0;font-size:11px;">
+        <option value="">自動+手動</option>
+        <option value="auto">自動</option>
+        <option value="manual">手動</option>
+      </select>
+      <select id="filter-status" onchange="renderRecords()"
+        style="padding:6px 10px;background:#111827;border:1px solid #374151;border-radius:6px;color:#e2e8f0;font-size:11px;">
+        <option value="">全部狀態</option>
+        <option value="open">未解決</option>
+        <option value="resolved">已解決</option>
+      </select>
+      <span style="font-size:11px;color:#4b5563;margin-left:auto;">共 <span id="record-count" style="color:#7c8ef7;font-weight:700;">0</span> 筆</span>
+    </div>
+
+    <!-- 紀錄表格 -->
+    <div class="card" style="padding:0;overflow:hidden;">
+      <table class="data-table" style="width:100%;">
+        <thead>
+          <tr style="background:#0f1117;">
+            <th style="width:110px;">時間</th>
+            <th style="width:60px;">類型</th>
+            <th>說明</th>
+            <th style="width:70px;">記錄者</th>
+            <th style="width:60px;">來源</th>
+            <th style="width:70px;">狀態</th>
+            <th style="width:60px;" id="action-col">操作</th>
+          </tr>
+        </thead>
+        <tbody id="records-tbody">
+          <tr><td colspan="6" style="text-align:center;color:#4b5563;padding:20px;">尚無紀錄</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- 管理員：新增紀錄 -->
+    <div id="admin-panel" style="display:none;margin-top:12px;">
+      <div class="card" style="border-color:#f59e0b44;">
+        <div class="card-title" style="color:#fbbf24;">🔓 管理員模式 — 新增 / 更正紀錄</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr auto;gap:8px;align-items:end;">
+          <div>
+            <div style="font-size:10px;color:#6b7280;margin-bottom:4px;">類型</div>
+            <select id="admin-cat" style="width:100%;padding:8px;background:#0f1117;border:1px solid #374151;border-radius:6px;color:#e2e8f0;font-size:12px;">
+              <option value="start">🚦 起跑錯誤</option>
+              <option value="collect">♻️ 回收失敗</option>
+              <option value="hdmi">📺 HDMI 消失</option>
+              <option value="arm">🦾 手臂失控</option>
+              <option value="cam">📷 Camera Offline</option>
+              <option value="timeout">⏱ Timeout</option>
+              <option value="op">📋 操作記錄</option>
+            </select>
+          </div>
+          <div>
+            <div style="font-size:10px;color:#6b7280;margin-bottom:4px;">說明</div>
+            <input id="admin-note" placeholder="說明內容" style="width:100%;padding:8px;background:#0f1117;border:1px solid #374151;border-radius:6px;color:#e2e8f0;font-size:12px;outline:none;">
+          </div>
+          <div>
+            <div style="font-size:10px;color:#6b7280;margin-bottom:4px;">時間（留空=現在）</div>
+            <input id="admin-time" type="datetime-local" style="width:100%;padding:8px;background:#0f1117;border:1px solid #374151;border-radius:6px;color:#e2e8f0;font-size:12px;outline:none;">
+          </div>
+          <button onclick="adminAddRecord()" style="padding:8px 16px;background:#f59e0b;color:#111;border:none;border-radius:6px;font-weight:700;cursor:pointer;font-size:12px;height:36px;">新增</button>
+        </div>
+      </div>
+
+    </div>
+
+  </div>
+
+  <!-- ===== 規格參考 ===== -->
+  <div class="panel" id="panel-spec">
+    <div class="grid2">
+      <!-- Arduino -->
+      <div class="card">
+        <div class="card-title">⚡ Arduino 指令表 <span style="font-size:10px;color:#4b5563;font-weight:400;">（點擊「回應」欄位可調整）</span></div>
+        <table class="data-table">
+          <tr><th>指令</th><th>功能</th><th>說明</th><th>回應</th></tr>
+          <tr><td><b style="color:#22d3ee;">GON</b></td><td>Gate Open</td><td>開啟起跑門</td><td><span class="resp-tag resp-ok" onclick="openRespPicker(this)">OK <span class="resp-edit-btn">▼</span></span></td></tr>
+          <tr><td><b style="color:#22d3ee;">BC</b></td><td>Ball Collect</td><td>回收球（開門1500ms）</td><td><span class="resp-tag resp-ok" onclick="openRespPicker(this)">OK <span class="resp-edit-btn">▼</span></span></td></tr>
+          <tr><td><b style="color:#22d3ee;">SC</b></td><td>Swap Color</td><td>交換顏色機構</td><td><span class="resp-tag resp-ok" onclick="openRespPicker(this)">OK <span class="resp-edit-btn">▼</span></span></td></tr>
+          <tr><td><b style="color:#22d3ee;">SS</b></td><td>Swap Ball</td><td>交換球機構</td><td><span class="resp-tag resp-ok" onclick="openRespPicker(this)">OK <span class="resp-edit-btn">▼</span></span></td></tr>
+        </table>
+        <div class="section-hd">通訊設定</div>
+        <div style="font-size:11px;color:#94a3b8;line-height:2;">
+          TCP/IP Socket ｜ ASCII ｜ CMD\n ｜ 回應：OK / ERROR / TIMEOUT
+        </div>
+      </div>
+
+      <!-- Command API -->
+      <div class="card">
+        <div class="card-title">📡 Command API 表 <span style="font-size:10px;color:#4b5563;font-weight:400;">（點擊「回應」欄位可調整）</span></div>
+        <table class="data-table">
+          <tr><th>指令</th><th>說明</th><th>格式</th><th>回應</th></tr>
+          <tr><td><b style="color:#7c8ef7;">CREATE</b></td><td>建立回合</td><td>CREATE\n</td><td><span class="resp-tag resp-ok" onclick="openRespPicker(this)">OK <span class="resp-edit-btn">▼</span></span></td></tr>
+          <tr><td><b style="color:#7c8ef7;">BETTING</b></td><td>開始下注</td><td>BETTING\n</td><td><span class="resp-tag resp-ok" onclick="openRespPicker(this)">OK <span class="resp-edit-btn">▼</span></span></td></tr>
+          <tr><td><b style="color:#7c8ef7;">GON</b></td><td>開始起跑</td><td>GON\n</td><td><span class="resp-tag resp-ok" onclick="openRespPicker(this)">OK <span class="resp-edit-btn">▼</span></span></td></tr>
+          <tr><td><b style="color:#7c8ef7;">RACING</b></td><td>開始比賽</td><td>RACING\n</td><td><span class="resp-tag resp-ok" onclick="openRespPicker(this)">OK <span class="resp-edit-btn">▼</span></span></td></tr>
+          <tr><td><b style="color:#7c8ef7;">SETTLE</b></td><td>結算</td><td>SETTLE\n</td><td><span class="resp-tag resp-ok" onclick="openRespPicker(this)">OK <span class="resp-edit-btn">▼</span></span></td></tr>
+          <tr><td><b style="color:#22d3ee;">BC</b></td><td>回收球</td><td>BC\n</td><td><span class="resp-tag resp-ok" onclick="openRespPicker(this)">OK <span class="resp-edit-btn">▼</span></span></td></tr>
+          <tr><td><b style="color:#22d3ee;">SC</b></td><td>換色</td><td>SC\n</td><td><span class="resp-tag resp-ok" onclick="openRespPicker(this)">OK <span class="resp-edit-btn">▼</span></span></td></tr>
+          <tr><td><b style="color:#22d3ee;">SS</b></td><td>換球</td><td>SS\n</td><td><span class="resp-tag resp-ok" onclick="openRespPicker(this)">OK <span class="resp-edit-btn">▼</span></span></td></tr>
+        </table>
+      </div>
+
+      <!-- 網路 -->
+      <div class="card">
+        <div class="card-title">🌐 網路與服務表 <span style="font-size:10px;color:#4b5563;font-weight:400;">（點擊狀態燈切換）</span></div>
+        <div>
+          <div class="net-item"><div><div style="font-weight:700;font-size:12px;">Main Server</div><div class="net-ip">192.168.10.10</div></div><div style="text-align:right"><div class="net-port">TCP:5000</div><div style="font-size:10px;color:#4b5563;">主控服務</div></div><div class="online-dot s-online" onclick="toggleNetStatus(this)"><div class="dot-circle"></div>線上</div></div>
+          <div class="net-item"><div><div style="font-weight:700;font-size:12px;">Tracking PC</div><div class="net-ip">192.168.10.11</div></div><div style="text-align:right"><div class="net-port">RTSP:554</div><div style="font-size:10px;color:#4b5563;">視覺辨識</div></div><div class="online-dot s-online" onclick="toggleNetStatus(this)"><div class="dot-circle"></div>線上</div></div>
+          <div class="net-item"><div><div style="font-weight:700;font-size:12px;">vMix PC</div><div class="net-ip">192.168.10.12</div></div><div style="text-align:right"><div class="net-port">TCP:8099</div><div style="font-size:10px;color:#4b5563;">vMix API</div></div><div class="online-dot s-online" onclick="toggleNetStatus(this)"><div class="dot-circle"></div>線上</div></div>
+          <div class="net-item"><div><div style="font-weight:700;font-size:12px;">Arduino Mega</div><div class="net-ip">192.168.10.20</div></div><div style="text-align:right"><div class="net-port">TCP:6000</div><div style="font-size:10px;color:#4b5563;">機構控制</div></div><div class="online-dot s-online" onclick="toggleNetStatus(this)"><div class="dot-circle"></div>線上</div></div>
+          <div class="net-item"><div><div style="font-weight:700;font-size:12px;">Robotic Arm</div><div class="net-ip">192.168.10.30</div></div><div style="text-align:right"><div class="net-port">TCP:7000</div><div style="font-size:10px;color:#4b5563;">手臂控制</div></div><div class="online-dot s-online" onclick="toggleNetStatus(this)"><div class="dot-circle"></div>線上</div></div>
+          <div class="net-item"><div><div style="font-weight:700;font-size:12px;">NAS / Backup</div><div class="net-ip">192.168.10.40</div></div><div style="text-align:right"><div class="net-port">SMB:445</div><div style="font-size:10px;color:#4b5563;">資料備份</div></div><div class="online-dot s-online" onclick="toggleNetStatus(this)"><div class="dot-circle"></div>線上</div></div>
+        </div>
+      </div>
+
+      <!-- 燈光 -->
+      <div class="card">
+        <div class="card-title">💡 燈光規格</div>
+        <table class="data-table">
+          <tr><th>區域</th><th>亮度 (Lux)</th><th>色溫</th><th>CRI</th></tr>
+          <tr><td>起跑區</td><td>1500</td><td>5600K</td><td>≥95</td></tr>
+          <tr><td>漏斗區</td><td>1800</td><td>5600K</td><td>≥95</td></tr>
+          <tr><td>終點區</td><td>2000</td><td>5600K</td><td>≥95</td></tr>
+          <tr><td>綠幕區</td><td>1200</td><td>5600K</td><td>≥95</td></tr>
+        </table>
+        <div style="margin-top:8px;font-size:11px;color:#6b7280;">Flicker Free 必須開啟 ｜ 色溫鎖定 5600K</div>
+      </div>
+
+      <!-- IO 接點表 -->
+      <div class="card">
+        <div class="card-title">🔌 IO 接點表（Arduino）</div>
+        <table class="data-table">
+          <tr><th>編號</th><th>名稱</th><th>Type</th><th>方向</th><th>說明</th></tr>
+          <tr><td>DI01</td><td>Start Gate Sensor</td><td>Digital</td><td><span class="tag tag-in">IN</span></td><td>起跑門狀態回饋</td></tr>
+          <tr><td>DI02</td><td>Finish Gate Sensor</td><td>Digital</td><td><span class="tag tag-in">IN</span></td><td>終點門狀態回饋</td></tr>
+          <tr><td>DO01</td><td>Start Gate Motor</td><td>Digital</td><td><span class="tag tag-out">OUT</span></td><td>起跑門馬達控制</td></tr>
+          <tr><td>DO02</td><td>Collect Gate Motor</td><td>Digital</td><td><span class="tag tag-out">OUT</span></td><td>回收門馬達控制</td></tr>
+          <tr><td>DO03</td><td>Swap Color Motor</td><td>Digital</td><td><span class="tag tag-out">OUT</span></td><td>換色馬達控制</td></tr>
+          <tr><td>DO04</td><td>Swap Ball Motor</td><td>Digital</td><td><span class="tag tag-out">OUT</span></td><td>換球馬達控制</td></tr>
+        </table>
+      </div>
+
+      <!-- Robotic Arm -->
+      <div class="card">
+        <div class="card-title">🦾 手臂動作規格</div>
+        <table class="data-table">
+          <tr><th>動作</th><th>路徑</th><th>時間</th><th>說明</th></tr>
+          <tr><td>S1</td><td>Home Position</td><td>10s</td><td>預備位置</td></tr>
+          <tr><td>S2</td><td>Start → 漏斗1</td><td>3s</td><td>取球站</td></tr>
+          <tr><td>S3</td><td>漏斗1 → 漏斗2</td><td>7s</td><td>轉接球</td></tr>
+          <tr><td>S4</td><td>漏斗2 → 終點</td><td>5s</td><td>放球至終點</td></tr>
+          <tr><td>S5</td><td>→ Winner Position</td><td>6s</td><td>勝者位置展示</td></tr>
+        </table>
+      </div>
+    </div>
+
+    <!-- CC 指令總表 -->
+    <div class="card">
+      <div class="card-title">🎛 VMIX CC 指令總表</div>
+      <div class="grid4" style="gap:16px;">
+        <div>
+          <div class="section-hd">Scene (CC 5~9, 12~17, 20)</div>
+          <div class="cc-mini">
+            <div class="cc-mini-item"><span class="cc-mini-num">CC05</span><span class="cc-mini-func">Classic S1</span></div>
+            <div class="cc-mini-item"><span class="cc-mini-num">CC06</span><span class="cc-mini-func">Classic S2</span></div>
+            <div class="cc-mini-item"><span class="cc-mini-num">CC07</span><span class="cc-mini-func">Classic S3</span></div>
+            <div class="cc-mini-item"><span class="cc-mini-num">CC08</span><span class="cc-mini-func">Classic S4</span></div>
+            <div class="cc-mini-item"><span class="cc-mini-num">CC09</span><span class="cc-mini-func">Classic S5</span></div>
+            <div class="cc-mini-item"><span class="cc-mini-num">CC12</span><span class="cc-mini-func">全綠幕</span></div>
+            <div class="cc-mini-item"><span class="cc-mini-num">CC13</span><span class="cc-mini-func">Super S1</span></div>
+            <div class="cc-mini-item"><span class="cc-mini-num">CC17</span><span class="cc-mini-func">Super S5</span></div>
+            <div class="cc-mini-item"><span class="cc-mini-num">CC20</span><span class="cc-mini-func">Super Green</span></div>
+          </div>
+        </div>
+        <div>
+          <div class="section-hd">Animation (CC 21~29)</div>
+          <div class="cc-mini">
+            <div class="cc-mini-item"><span class="cc-mini-num">CC21</span><span class="cc-mini-func">Fight</span></div>
+            <div class="cc-mini-item"><span class="cc-mini-num">CC22</span><span class="cc-mini-func">S1 Anim</span></div>
+            <div class="cc-mini-item"><span class="cc-mini-num">CC23</span><span class="cc-mini-func">S2 Anim</span></div>
+            <div class="cc-mini-item"><span class="cc-mini-num">CC24</span><span class="cc-mini-func">S3 Anim</span></div>
+            <div class="cc-mini-item"><span class="cc-mini-num">CC25</span><span class="cc-mini-func">S4 Anim</span></div>
+            <div class="cc-mini-item"><span class="cc-mini-num">CC26</span><span class="cc-mini-func">S5 Anim</span></div>
+            <div class="cc-mini-item"><span class="cc-mini-num">CC28</span><span class="cc-mini-func">Leader 藍</span></div>
+            <div class="cc-mini-item"><span class="cc-mini-num">CC29</span><span class="cc-mini-func">Leader 黃</span></div>
+          </div>
+        </div>
+        <div>
+          <div class="section-hd">Winner / Effect (CC 47~67)</div>
+          <div class="cc-mini">
+            <div class="cc-mini-item"><span class="cc-mini-num">CC47~52</span><span class="cc-mini-func">LEFT 倍率</span></div>
+            <div class="cc-mini-item"><span class="cc-mini-num">CC53~58</span><span class="cc-mini-func">MID 倍率</span></div>
+            <div class="cc-mini-item"><span class="cc-mini-num">CC59~64</span><span class="cc-mini-func">RIGHT 倍率</span></div>
+            <div class="cc-mini-item"><span class="cc-mini-num">CC65</span><span class="cc-mini-func">LEFT 消失</span></div>
+            <div class="cc-mini-item"><span class="cc-mini-num">CC66</span><span class="cc-mini-func">MID 消失</span></div>
+            <div class="cc-mini-item"><span class="cc-mini-num">CC67</span><span class="cc-mini-func">RIGHT 消失</span></div>
+            <div class="cc-mini-item"><span class="cc-mini-num">CC37~40</span><span class="cc-mini-func">RNG 動作</span></div>
+            <div class="cc-mini-item"><span class="cc-mini-num">CC41~46</span><span class="cc-mini-func">路徑方向</span></div>
+          </div>
+        </div>
+        <div>
+          <div class="section-hd">Control / Audio</div>
+          <div class="cc-mini">
+            <div class="cc-mini-item"><span class="cc-mini-num">CC01</span><span class="cc-mini-func">開始側錄</span></div>
+            <div class="cc-mini-item"><span class="cc-mini-num">CC02</span><span class="cc-mini-func">停止側錄</span></div>
+            <div class="cc-mini-item"><span class="cc-mini-num">CC03</span><span class="cc-mini-func">碼表開始</span></div>
+            <div class="cc-mini-item"><span class="cc-mini-num">CC04</span><span class="cc-mini-func">碼表歸零</span></div>
+            <div class="cc-mini-item"><span class="cc-mini-num">CC30</span><span class="cc-mini-func">倒帶所有</span></div>
+            <div class="cc-mini-item"><span class="cc-mini-num">CC31</span><span class="cc-mini-func">倒帶Bet</span></div>
+            <div class="cc-mini-item"><span class="cc-mini-num">CC68</span><span class="cc-mini-func">Audio Down</span></div>
+            <div class="cc-mini-item"><span class="cc-mini-num">CC69</span><span class="cc-mini-func">Audio Up</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div><!-- /main-app -->
+
+<!-- TOAST -->
+<div id="toast"></div>
+
+<script>
+// ── 密碼 ──
+const PASSWORD = "0329";
+
+// AUTH
+function checkAuth() {
+  const name = document.getElementById('uname').value.trim();
+  if (!name) {
+    document.getElementById('auth-err').textContent = '請填寫您的姓名';
+    document.getElementById('uname').focus(); return;
+  }
+  sessionStorage.setItem('wt_auth','1');
+  sessionStorage.setItem('wt_user', name);
+  document.getElementById('auth-gate').style.display = 'none';
+  document.getElementById('main-app').style.display = 'block';
+  showUserName();
+  init();
+}
+function doLogout() {
+  sessionStorage.removeItem('wt_auth');
+  sessionStorage.removeItem('wt_user');
+  location.reload();
+}
+function showUserName() {
+  const name = sessionStorage.getItem('wt_user') || '';
+  const el   = document.getElementById('topbar-user');
+  if (el && name) el.textContent = '👤 ' + name;
+}
+if (sessionStorage.getItem('wt_auth')==='1') {
+  document.getElementById('auth-gate').style.display='none';
+  document.getElementById('main-app').style.display='block';
+  showUserName();
+}
+
+// CLOCK
+function updateClock() {
+  const now = new Date();
+  document.getElementById('clock').textContent = now.toLocaleTimeString('zh-TW');
+}
+setInterval(updateClock, 1000); updateClock();
+
+// TAB
+function switchTab(id, btn) {
+  document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));
+  document.getElementById('panel-'+id).classList.add('active');
+  btn.classList.add('active');
+}
+
+// TOAST
+function toast(type, msg) {
+  const t = document.getElementById('toast');
+  const el = document.createElement('div');
+  el.className = 'toast-item toast-'+type;
+  el.textContent = (type==='error'?'🚨 ':type==='warn'?'⚠️ ':'✅ ') + msg;
+  t.appendChild(el);
+  logError(msg);
+  setTimeout(()=>el.remove(), 4000);
+}
+
+// ERROR LOG
+function logError(msg) {
+  const log = document.getElementById('error-log');
+  const now = new Date().toLocaleTimeString('zh-TW');
+  if (log.textContent === '尚無異常紀錄') log.textContent = '';
+  log.innerHTML += `<div style="padding:3px 0;border-bottom:1px solid #1f2937;"><span style="color:#4b5563;">${now}</span> ${msg}</div>`;
+}
+
+// ── RACE STEPS (防呆) ──
+const RACE_STEPS_DEF = [
+  { title:'Health Check', desc:'確認所有系統正常', warn:'⚠ 請確認 Main Control 無警告', badge:'auto' },
+  { title:'Create Round', desc:'建立新回合 (5s)', warn:'⚠ 等待 CREATE 完成再進行下一步', badge:'auto' },
+  { title:'確認起點彈珠', desc:'1 藍球 + 1 黃球', warn:'⚠ 防呆：彈珠顏色錯誤將觸發 Void', badge:'manual' },
+  { title:'Betting 開始', desc:'下注階段 (7s)', warn:'⚠ Betting 期間請勿觸碰彈珠', badge:'auto' },
+  { title:'GON — 開門起跑', desc:'發送 GON 指令', warn:'⚠ 確認兩顆球皆已正常出發', badge:'manual' },
+  { title:'Racing — 追蹤中', desc:'比賽進行中 (20~30s)', warn:'⚠ 超過 35s 需手動 Void', badge:'auto' },
+  { title:'Settle 結算', desc:'結算並等待 Collect (4s)', warn:'⚠ 確認彈珠完全回收後才進行下一回合', badge:'manual' },
+];
+
+let raceStep = 0;
+
+function renderRaceSteps() {
+  const container = document.getElementById('race-steps');
+  container.innerHTML = '';
+  RACE_STEPS_DEF.forEach((s, i) => {
+    const div = document.createElement('div');
+    div.className = 'flow-step ' + (i < raceStep ? 'done' : i === raceStep ? 'current unlocked' : 'locked');
+    div.onclick = () => advanceRace(i);
+
+    const iconClass = i < raceStep ? 'done-icon' : i === raceStep ? 'current-icon' : 'locked-icon';
+    const iconContent = i < raceStep ? '✓' : i + 1;
+    const badgeColor = s.badge === 'auto' ? 'badge-auto' : s.badge === 'manual' ? 'badge-manual' : 'badge-check';
+    const badgeLabel = s.badge === 'auto' ? '自動' : '手動確認';
+
+    div.innerHTML = `
+      <div class="step-icon ${iconClass}">${iconContent}</div>
+      <div class="step-content">
+        <div class="step-title">${s.title} <span class="step-badge ${badgeColor}">${badgeLabel}</span></div>
+        <div class="step-desc">${s.desc}</div>
+        <div class="step-warn">${s.warn}</div>
+      </div>
+    `;
+    container.appendChild(div);
+  });
+  const pct = (raceStep / RACE_STEPS_DEF.length * 100).toFixed(0);
+  document.getElementById('race-prog').style.width = pct + '%';
+  document.getElementById('race-prog-label').textContent = `進度：${raceStep} / ${RACE_STEPS_DEF.length} 步驟`;
+}
+
+function advanceRace(i) {
+  if (i !== raceStep) {
+    if (i < raceStep) {
+      toast('warn', '此步驟已完成');
+    } else {
+      toast('error', '防呆：請依序完成步驟！');
+    }
+    return;
+  }
+  raceStep++;
+  if (raceStep === RACE_STEPS_DEF.length) {
+    toast('ok', '本回合所有步驟完成！可進行結算');
+    raceStep = 0; // auto reset for next round
+  } else {
+    toast('ok', `步驟 ${i+1} 完成 → ${RACE_STEPS_DEF[raceStep].title}`);
+  }
+  renderRaceSteps();
+}
+
+function resetRace() { raceStep = 0; renderRaceSteps(); toast('warn','賽事步驟已重置'); }
+
+// ── BOOT STEPS ──
+const BOOT_DEF = ['Main Control Server','Arduino Mega','Tracking Cameras','PTZ Camera','VMIX','Robotic Arm','Studio Light'];
+const SHUT_DEF = ['停止循環','關閉手臂','關閉 VMIX','關閉 Tracking','關閉 Arduino','關閉 Main Control'];
+let bootStep = 0, shutStep = 0;
+
+function renderOrderedSteps(id, defs, currentIdx, advanceFn) {
+  const container = document.getElementById(id);
+  container.innerHTML = '';
+  defs.forEach((s, i) => {
+    const div = document.createElement('div');
+    div.className = 'flow-step ' + (i < currentIdx ? 'done' : i === currentIdx ? 'current unlocked' : 'locked');
+    div.onclick = () => advanceFn(i);
+    const iconClass = i < currentIdx ? 'done-icon' : i === currentIdx ? 'current-icon' : 'locked-icon';
+    div.innerHTML = `<div class="step-icon ${iconClass}">${i < currentIdx ? '✓' : i+1}</div><div class="step-content"><div class="step-title">${s}</div></div>`;
+    container.appendChild(div);
+  });
+}
+
+function advanceBoot(i) {
+  if (i !== bootStep) { toast('error','防呆：請依序完成開機步驟！'); return; }
+  bootStep++;
+  if (bootStep === BOOT_DEF.length) toast('ok','開機完成！系統就緒');
+  else toast('ok', `Step ${i+1} 完成 → ${BOOT_DEF[bootStep]}`);
+  renderOrderedSteps('boot-steps', BOOT_DEF, bootStep, advanceBoot);
+}
+function advanceShut(i) {
+  if (i !== shutStep) { toast('error','防呆：請依序完成關機步驟！'); return; }
+  shutStep++;
+  if (shutStep === SHUT_DEF.length) toast('ok','關機完成');
+  else toast('ok', `完成 → ${SHUT_DEF[shutStep]}`);
+  renderOrderedSteps('shut-steps', SHUT_DEF, shutStep, advanceShut);
+}
+function resetBootSteps() { bootStep=0; renderOrderedSteps('boot-steps',BOOT_DEF,0,advanceBoot); toast('warn','開機步驟已重置'); }
+function resetShutSteps() { shutStep=0; renderOrderedSteps('shut-steps',SHUT_DEF,0,advanceShut); toast('warn','關機步驟已重置'); }
+
+// ── CHECKLIST ──
+function chk(el, prefix) {
+  el.classList.toggle('checked');
+  const all = document.querySelectorAll('#'+prefix+'-check .check-item');
+  const done = document.querySelectorAll('#'+prefix+'-check .check-item.checked');
+  const bar = document.getElementById(prefix+'-prog');
+  if (bar) bar.style.width = (done.length/all.length*100)+'%';
+}
+function resetChecks(prefix) {
+  document.querySelectorAll('#'+prefix+'-check .check-item').forEach(i=>i.classList.remove('checked'));
+  const bar = document.getElementById(prefix+'-prog');
+  if (bar) bar.style.width='0%';
+}
+
+// ── TIMER ──
+let timerInterval, timerSec = 0, timerRunning = false;
+function updateTimerDisplay() {
+  const m = Math.floor(timerSec/60).toString().padStart(2,'0');
+  const s = (timerSec%60).toString().padStart(2,'0');
+  const el = document.getElementById('timer-display');
+  el.textContent = m+':'+s;
+  el.className = 'timer-display ' + (timerSec < 20 ? 'timer-normal' : timerSec < 30 ? 'timer-warning' : 'timer-danger');
+  if (timerSec === 35) toast('error','⚠ Timeout 35s！請執行 Void Round');
+}
+function startTimer() {
+  if (timerRunning) return;
+  timerRunning = true;
+  timerInterval = setInterval(() => { timerSec++; updateTimerDisplay(); }, 1000);
+  toast('ok','計時器開始');
+}
+function stopTimer() { clearInterval(timerInterval); timerRunning=false; toast('warn','計時器暫停'); }
+function resetTimer() { stopTimer(); timerSec=0; updateTimerDisplay(); }
+
+// ── ROUND ──
+let round = 1, voids = [];
+function nextRound() {
+  round++; document.getElementById('round-num').textContent = round;
+  raceStep = 0; renderRaceSteps();
+  resetTimer();
+  toast('ok', `Round ${round} 開始`);
+}
+function voidRound() {
+  voids.push(`Round ${round}`);
+  document.getElementById('void-log').textContent = voids.join(' ／ ');
+  toast('error', `Round ${round} → VOID`);
+  logError(`Void Round ${round}`);
+  round++; document.getElementById('round-num').textContent = round;
+  raceStep = 0; renderRaceSteps();
+  resetTimer();
+}
+
+// ── BALL CHECK ──
+let ballBlue = false, ballYellow = false;
+function toggleBall(color) {
+  if (color==='blue') { ballBlue=!ballBlue; document.getElementById('ball-blue').style.borderColor=ballBlue?'#3b82f6':'#3b5bdb44'; }
+  else { ballYellow=!ballYellow; document.getElementById('ball-yellow').style.borderColor=ballYellow?'#f59e0b':'#f59e0b44'; }
+  const ok = ballBlue && ballYellow;
+  const st = document.getElementById('ball-status');
+  const al = document.getElementById('ball-check-alert');
+  if (ok) { st.textContent='✅ 確認：1 藍 + 1 黃 — 可以起跑'; st.style.color='#4ade80'; al.innerHTML=''; }
+  else if (!ballBlue && !ballYellow) { st.textContent='需確認 1 藍 + 1 黃'; st.style.color='#4b5563'; al.innerHTML=''; }
+  else { st.textContent='⚠ 防呆：彈珠數量不足！'; st.style.color='#f87171'; al.innerHTML='<div class="alert alert-error">🚨 起跑條件未滿足 — 請勿發送 GON 指令</div>'; }
+}
+
+// ── STATE MACHINE ──
+const STATE_IDS = ['idle','create','betting','racing','settle','error'];
+function setState(s) {
+  STATE_IDS.forEach(id => document.getElementById('st-'+id)?.classList.remove('ACTIVE'));
+  document.getElementById('st-'+s)?.classList.add('ACTIVE');
+  document.getElementById('current-state-label').textContent = s.toUpperCase();
+  if (s==='error') toast('error','進入 ERROR STATE！請排除異常');
+}
+
+// ── ERROR LOGGING SYSTEM ──
+let errTotal = 0, errOpen = 0;
+
+const ERR_NAMES = {
+  start:'🚦 起跑錯誤', collect:'♻️ 回收失敗',
+  hdmi:'📺 HDMI 消失', arm:'🦾 手臂失控',
+  cam:'📷 Camera Offline', timeout:'⏱ Timeout'
+};
+
+function triggerAlert(id, title, msg, level) {
+  const now = new Date().toLocaleTimeString('zh-TW');
+  appendMiniLog(id, now, msg, 'auto');
+  const card = document.getElementById('ec-'+id);
+  card.classList.remove('resolved');
+  card.classList.add(level === 'error' ? 'has-error' : 'has-warn');
+  document.getElementById('resolve-'+id).style.display = 'block';
+  showBanner(title, msg, level);
+  errTotal++; errOpen++;
+  updateErrStats();
+  appendGlobalLog(now, title, msg, 'auto', level);
+  toast(level, `${title}：${msg}`);
+  // 寫入永久紀錄
+  addLog(id, title, msg, 'auto');
+}
+
+function manualLog(id, title) {
+  const now = new Date().toLocaleTimeString('zh-TW');
+  const note = prompt(`手動記錄「${ERR_NAMES[id]}」\n請輸入備註（可留空）：`) ?? '';
+  if (note === null) return;
+  const msg = note || '人工記錄';
+  appendMiniLog(id, now, msg, 'manual');
+  const card = document.getElementById('ec-'+id);
+  card.classList.remove('resolved');
+  if (!card.classList.contains('has-error')) card.classList.add('has-warn');
+  document.getElementById('resolve-'+id).style.display = 'block';
+  errTotal++; errOpen++;
+  updateErrStats();
+  appendGlobalLog(now, title, msg, 'manual', 'warn');
+  toast('warn', `[手動] ${title}：${msg}`);
+  // 寫入永久紀錄
+  addLog(id, title, msg, 'manual');
+}
+
+function submitManual() {
+  const id    = document.getElementById('manual-type').value;
+  const note  = document.getElementById('manual-note').value.trim();
+  const title = ERR_NAMES[id];
+  const now   = new Date().toLocaleTimeString('zh-TW');
+  const msg   = note || '人工記錄';
+  appendMiniLog(id, now, msg, 'manual');
+  const card = document.getElementById('ec-'+id);
+  card.classList.remove('resolved');
+  if (!card.classList.contains('has-error')) card.classList.add('has-warn');
+  document.getElementById('resolve-'+id).style.display = 'block';
+  errTotal++; errOpen++;
+  updateErrStats();
+  appendGlobalLog(now, title, msg, 'manual', 'warn');
+  toast('warn', `[手動] ${title}：${msg}`);
+  document.getElementById('manual-note').value = '';
+  // 寫入永久紀錄
+  addLog(id, title, msg, 'manual');
+}
+
+function resolveErr(id) {
+  const now = new Date().toLocaleTimeString('zh-TW');
+  const title = ERR_NAMES[id];
+  appendMiniLog(id, now, '已解決', 'resolved');
+  const card = document.getElementById('ec-'+id);
+  card.classList.remove('has-error','has-warn');
+  card.classList.add('resolved');
+  document.getElementById('resolve-'+id).style.display = 'none';
+  errOpen = Math.max(0, errOpen - 1);
+  updateErrStats();
+  appendGlobalLog(now, title, '已解決', 'resolved', 'ok');
+  toast('ok', `${title} 已標記解決`);
+  if (errOpen === 0) closeBanner();
+}
+
+function appendMiniLog(id, time, msg, type) {
+  const log = document.getElementById('log-'+id);
+  const el = document.createElement('div');
+  el.className = 'mini-log-item ' + type;
+  const badge = type==='auto'?'自動':type==='manual'?'手動':'已解決';
+  el.innerHTML = `<span class="mini-log-time">${time}</span><span class="mini-log-badge badge-${type==='resolved'?'resolved':type}">${badge}</span><span class="mini-log-text">${msg}</span>`;
+  log.appendChild(el);
+  log.scrollTop = log.scrollHeight;
+}
+
+function appendGlobalLog(time, title, msg, type, level) {
+  rebuildErrorLog();
+}
+
+// 從 localStorage 重建整個彙總紀錄
+function rebuildErrorLog() {
+  const log = document.getElementById('error-log');
+  if (!log) return;
+  const logs = getLogs().filter(l => l.cat !== 'op').sort((a,b) => new Date(b.ts)-new Date(a.ts));
+  if (!logs.length) { log.textContent = '尚無異常紀錄'; return; }
+  log.innerHTML = '';
+  logs.forEach(l => {
+    const time  = new Date(l.ts).toLocaleTimeString('zh-TW');
+    const color = l.resolved ? '#4ade80' : (l.source==='auto' ? '#f87171' : '#fbbf24');
+    const badge = l.resolved ? '已解決' : (l.source==='auto' ? '自動' : '手動');
+    const badgeCls = l.resolved ? 'badge-resolved' : (l.source==='auto' ? 'badge-auto' : 'badge-manual');
+    const op    = l.operator ? `<span style="color:#4b5563;font-size:10px;">${l.operator}</span>` : '';
+    const delBtn = isAdmin
+      ? `<button onclick="adminDeleteFromLog('${l.id}')" style="padding:1px 6px;border-radius:3px;border:1px solid #f8717144;background:transparent;color:#f87171;font-size:9px;cursor:pointer;flex-shrink:0;">刪</button>`
+      : '';
+    const el = document.createElement('div');
+    el.style.cssText = 'padding:5px 8px;border-bottom:1px solid #1f2937;display:flex;gap:6px;align-items:center;';
+    el.innerHTML = `<span style="color:#4b5563;font-size:10px;flex-shrink:0;">${time}</span><span style="color:${color};font-weight:700;">${l.title}</span>${op}<span style="color:#94a3b8;flex:1;">${l.msg}</span><span class="mini-log-badge ${badgeCls}">${badge}</span>${delBtn}`;
+    log.appendChild(el);
+  });
+  const badge = document.getElementById('err-total-badge');
+  if (badge) { badge.textContent = logs.length; badge.style.display = 'inline-block'; }
+  // 管理員清除按鈕顯示
+  const cb = document.getElementById('admin-clear-log-btn');
+  if (cb) cb.style.display = isAdmin ? 'inline-block' : 'none';
+}
+
+function adminDeleteFromLog(id) {
+  if (!isAdmin || !confirm('確定刪除此筆異常紀錄？')) return;
+  const logs = getLogs().filter(l => l.id !== id);
+  saveLogs(logs);
+  rebuildErrorLog();
+  renderRecords();
+  toast('warn','已刪除紀錄');
+}
+
+function adminClearErrorLog() {
+  if (!isAdmin || !confirm('確定清除所有異常彙總紀錄？此操作無法復原。')) return;
+  const logs = getLogs().filter(l => l.cat === 'op');
+  saveLogs(logs);
+  rebuildErrorLog();
+  renderRecords();
+  toast('warn','彙總紀錄已清除');
+}
+
+function updateErrStats() {
+  document.getElementById('err-total').textContent = errTotal;
+  document.getElementById('err-open').textContent  = errOpen;
+  // Nav badge
+  let nb = document.getElementById('err-nav-badge');
+  if (!nb) {
+    nb = document.createElement('span');
+    nb.id = 'err-nav-badge';
+    nb.className = 'nav-badge';
+    document.querySelector('[onclick*="error"]').appendChild(nb);
+  }
+  nb.textContent = errOpen;
+  nb.style.display = errOpen > 0 ? 'inline-block' : 'none';
+}
+
+function showBanner(title, msg, level) {
+  const banner = document.getElementById('alert-banner');
+  banner.style.display = 'flex';
+  banner.style.animation = 'banner-flash 0.8s infinite';
+  document.getElementById('banner-title').textContent = title;
+  document.getElementById('banner-msg').textContent   = msg;
+  // push content down
+  document.getElementById('main-app').style.paddingTop = '60px';
+}
+
+function closeBanner() {
+  const banner = document.getElementById('alert-banner');
+  banner.style.display = 'none';
+  document.getElementById('main-app').style.paddingTop = '0';
+}
+
+function switchToError() {
+  closeBanner();
+  document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));
+  document.getElementById('panel-error').classList.add('active');
+  document.querySelector('[onclick*="error"]').classList.add('active');
+}
+
+function clearAllLogs() {
+  if (!confirm('確定清除所有異常紀錄？')) return;
+  Object.keys(ERR_NAMES).forEach(id => {
+    const log = document.getElementById('log-'+id);
+    if (log) log.innerHTML = '';
+    const card = document.getElementById('ec-'+id);
+    if (card) card.classList.remove('has-error','has-warn','resolved');
+    const rb = document.getElementById('resolve-'+id);
+    if (rb) rb.style.display = 'none';
+  });
+  document.getElementById('error-log').textContent = '尚無異常紀錄';
+  errTotal = 0; errOpen = 0;
+  updateErrStats();
+  closeBanner();
+  toast('ok','所有異常紀錄已清除');
+}
+
+// ══════════════════════════════════════════════
+// 📝 永久紀錄系統 (localStorage)
+// ══════════════════════════════════════════════
+const STORE_KEY  = 'wt_permanent_logs';
+const ADMIN_PASS_DEFAULT = 'adminadmin0000';
+function getAdminPass() { return localStorage.getItem('wt_admin_pw') || ADMIN_PASS_DEFAULT; }
+let isAdmin      = false;
+let currentPeriod = 'day';
+
+function getLogs() {
+  try { return JSON.parse(localStorage.getItem(STORE_KEY) || '[]'); }
+  catch { return []; }
+}
+function saveLogs(arr) { localStorage.setItem(STORE_KEY, JSON.stringify(arr)); }
+
+function addLog(cat, title, msg, source) {
+  const logs = getLogs();
+  logs.push({
+    id:         Date.now() + Math.random().toString(36).slice(2,6),
+    cat, title, msg, source,
+    operator:   sessionStorage.getItem('wt_user') || '未知',
+    ts:         new Date().toISOString(),
+    resolved:   false, resolvedAt: null,
+    editedBy:   null,  editNote:   null
+  });
+  saveLogs(logs);
+  renderRecords();
+}
+
+function resolveLog(id) {
+  const logs = getLogs(), e = logs.find(l=>l.id===id);
+  if (e) { e.resolved=true; e.resolvedAt=new Date().toISOString(); }
+  saveLogs(logs); renderRecords();
+}
+
+function adminEditLog(id) {
+  if (!isAdmin) return;
+  const logs = getLogs(), e = logs.find(l=>l.id===id);
+  if (!e) return;
+  const v = prompt('更正說明（目前：'+e.msg+'）：', e.msg);
+  if (v===null) return;
+  e.editNote=e.msg; e.msg=v; e.editedBy='管理員';
+  saveLogs(logs); renderRecords(); toast('ok','已更正紀錄');
+}
+
+function adminDeleteLog(id) {
+  if (!isAdmin||!confirm('確定刪除此筆紀錄？此操作無法復原。')) return;
+  const logs=getLogs().filter(l=>l.id!==id);
+  saveLogs(logs); renderRecords(); toast('warn','已刪除紀錄');
+}
+
+function adminAddRecord() {
+  if (!isAdmin) return;
+  const cat   = document.getElementById('admin-cat').value;
+  const note  = document.getElementById('admin-note').value.trim();
+  const tsRaw = document.getElementById('admin-time').value;
+  if (!note) { toast('error','請輸入說明內容'); return; }
+  const logs = getLogs();
+  logs.push({
+    id:       Date.now()+Math.random().toString(36).slice(2,6),
+    cat,      title: ERR_NAMES[cat]||'📋 操作記錄',
+    msg:      note,  source: 'admin',
+    operator: sessionStorage.getItem('wt_user') || '管理員',
+    ts:       tsRaw ? new Date(tsRaw).toISOString() : new Date().toISOString(),
+    resolved: false, resolvedAt: null,
+    editedBy: '管理員', editNote: null
+  });
+  saveLogs(logs);
+  document.getElementById('admin-note').value='';
+  renderRecords(); toast('ok','管理員已新增紀錄');
+}
+
+function setPeriod(p, btn) {
+  currentPeriod = p;
+  document.querySelectorAll('.period-btn').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById('period-label').textContent = {day:'今日',week:'本週',month:'本月',all:'全部'}[p];
+  renderRecords();
+}
+
+function inPeriod(tsISO, period) {
+  const d=new Date(tsISO), now=new Date();
+  if (period==='all') return true;
+  if (period==='day') return d.toDateString()===now.toDateString();
+  if (period==='week') {
+    const s=new Date(now); s.setDate(now.getDate()-now.getDay()); s.setHours(0,0,0,0);
+    return d>=s;
+  }
+  if (period==='month') return d.getFullYear()===now.getFullYear()&&d.getMonth()===now.getMonth();
+  return true;
+}
+
+function renderRecords() {
+  const allLogs = getLogs();
+  const ft = document.getElementById('filter-type')?.value   || '';
+  const fs = document.getElementById('filter-source')?.value || '';
+  const fst= document.getElementById('filter-status')?.value || '';
+  const filtered = allLogs.filter(l => {
+    if (l.hidden) return false;
+    if (!inPeriod(l.ts,currentPeriod)) return false;
+    if (ft  && l.cat   !==ft)  return false;
+    if (fs  && l.source!==fs)  return false;
+    if (fst==='open'     && l.resolved)  return false;
+    if (fst==='resolved' && !l.resolved) return false;
+    return true;
+  }).sort((a,b)=>new Date(b.ts)-new Date(a.ts));
+
+  const cnt = document.getElementById('record-count');
+  if (cnt) cnt.textContent = filtered.length;
+
+  const tbody = document.getElementById('records-tbody');
+  if (!tbody) return;
+  tbody.innerHTML = filtered.length===0
+    ? `<tr><td colspan="6" style="text-align:center;color:#4b5563;padding:20px;">此期間無紀錄</td></tr>`
+    : filtered.map(l=>{
+        const dt=new Date(l.ts);
+        const ts=dt.toLocaleDateString('zh-TW')+' '+dt.toLocaleTimeString('zh-TW',{hour:'2-digit',minute:'2-digit'});
+        const srcCls=l.source==='auto'?'src-auto':l.source==='admin'?'src-admin':'src-manual';
+        const srcLbl=l.source==='auto'?'自動':l.source==='admin'?'管理員':'手動';
+        const stCls =l.cat==='op'?'st-op':l.resolved?'st-resolved':'st-open';
+        const stLbl =l.cat==='op'?'操作':l.resolved?'已解決':'未解決';
+        const edited=l.editedBy?`<span title="原：${l.editNote}" style="color:#f59e0b;font-size:9px;margin-left:4px;">✎</span>`:'';
+        const resolveBtn=(!l.resolved&&l.cat!=='op')
+          ?`<button onclick="resolveLog('${l.id}')" style="margin-left:4px;padding:1px 5px;border-radius:3px;border:1px solid #22c55e44;background:transparent;color:#4ade80;font-size:9px;cursor:pointer;">✓ 解決</button>`:'';
+        const adminCol=isAdmin
+          ?`<td><button class="edit-btn" onclick="adminEditLog('${l.id}')">更正</button> <button class="del-btn" onclick="adminDeleteLog('${l.id}')">刪</button></td>`
+          :`<td></td>`;
+        const op = l.operator || '—';
+        return `<tr class="rec-row"><td style="color:#4b5563;white-space:nowrap;">${ts}</td><td style="font-size:12px;">${l.title}</td><td style="color:#cbd5e1;">${l.msg}${edited}</td><td style="color:#94a3b8;font-size:11px;">${op}</td><td><span class="${srcCls}">${srcLbl}</span></td><td><span class="${stCls}">${stLbl}</span>${resolveBtn}</td>${adminCol}</tr>`;
+      }).join('');
+
+  renderStats(allLogs, currentPeriod);
+  const ac=document.getElementById('action-col');
+  if (ac) ac.style.display=isAdmin?'':'none';
+}
+
+function renderStats(allLogs, period) {
+  const inP  = allLogs.filter(l=>!l.hidden&&inPeriod(l.ts,period));
+  const errs = inP.filter(l=>l.cat!=='op');
+  const res  = errs.filter(l=>l.resolved);
+  const open = errs.filter(l=>!l.resolved);
+  const rate = errs.length?Math.round(res.length/errs.length*100):0;
+  const sc   = document.getElementById('stat-cards');
+  if (!sc) return;
+  sc.innerHTML=[
+    {v:errs.length,    l:'異常總數', c:'#f87171'},
+    {v:open.length,    l:'未解決',   c:'#fbbf24'},
+    {v:res.length,     l:'已解決',   c:'#4ade80'},
+    {v:rate+'%',       l:'解決率',   c:'#7c8ef7'},
+    {v:inP.filter(l=>l.source==='auto').length,   l:'自動記錄', c:'#94a3b8'},
+    {v:inP.filter(l=>l.source==='manual').length, l:'手動記錄', c:'#94a3b8'},
+  ].map(s=>`<div class="stat-card"><div class="stat-val" style="color:${s.c}">${s.v}</div><div class="stat-lbl">${s.l}</div></div>`).join('');
+
+  const cats=['start','collect','hdmi','arm','cam','timeout'];
+  const colors={start:'#f87171',collect:'#fbbf24',hdmi:'#a78bfa',arm:'#f472b6',cam:'#22d3ee',timeout:'#fb923c'};
+  const max=Math.max(1,...cats.map(c=>errs.filter(l=>l.cat===c).length));
+  const tb=document.getElementById('type-bars');
+  if (tb) tb.innerHTML=cats.map(c=>{
+    const cnt=errs.filter(l=>l.cat===c).length;
+    return `<div class="type-bar-row"><div class="type-bar-label">${ERR_NAMES[c]}</div><div class="type-bar-track"><div class="type-bar-fill" style="width:${Math.round(cnt/max*100)}%;background:${colors[c]};"></div></div><div class="type-bar-count">${cnt}</div></div>`;
+  }).join('');
+}
+
+function toggleAdmin() {
+  if (isAdmin) {
+    isAdmin=false;
+    document.getElementById('admin-status').textContent='🔒 一般模式';
+    document.getElementById('admin-status').style.color='#4b5563';
+    document.getElementById('admin-btn').textContent='管理員登入';
+    document.getElementById('admin-panel').style.display='none';
+    const cb=document.getElementById('admin-clear-log-btn');
+    if(cb) cb.style.display='none';
+    renderRecords(); rebuildErrorLog(); toast('ok','已登出管理員'); return;
+  }
+  const pw=prompt('請輸入管理員密碼：');
+  if (pw!==getAdminPass()) { toast('error','密碼錯誤'); return; }
+  const adminName=prompt('請輸入管理員姓名：')?.trim();
+  if (!adminName) { toast('error','姓名不可空白'); return; }
+  isAdmin=true;
+  sessionStorage.setItem('wt_user', adminName);
+  document.getElementById('topbar-user').textContent='🔓 ' + adminName + '（管理員）';
+  document.getElementById('admin-status').textContent='🔓 管理員：' + adminName;
+  document.getElementById('admin-status').style.color='#fbbf24';
+  document.getElementById('admin-btn').textContent='登出管理員';
+  document.getElementById('admin-panel').style.display='block';
+  const cb=document.getElementById('admin-clear-log-btn');
+  if(cb) cb.style.display='inline-block';
+  renderRecords(); rebuildErrorLog(); toast('ok','歡迎，' + adminName + '（管理員）');
+}
+
+function openPwModal() {
+  if (!isAdmin) return;
+  document.getElementById('pw-admin-old').value='';
+  document.getElementById('pw-admin-new').value='';
+  document.getElementById('pw-admin-confirm').value='';
+  document.getElementById('pw-admin-msg').textContent='';
+  const m = document.getElementById('pw-modal');
+  m.style.display='flex';
+}
+function closePwModal() {
+  document.getElementById('pw-modal').style.display='none';
+}
+function changeAdminPw() {
+  const old  = document.getElementById('pw-admin-old').value;
+  const nw   = document.getElementById('pw-admin-new').value;
+  const conf = document.getElementById('pw-admin-confirm').value;
+  const msg  = document.getElementById('pw-admin-msg');
+  if (old !== getAdminPass()) { msg.style.color='#f87171'; msg.textContent='目前密碼錯誤'; return; }
+  if (!nw)       { msg.style.color='#f87171'; msg.textContent='新密碼不可空白'; return; }
+  if (nw!==conf) { msg.style.color='#f87171'; msg.textContent='兩次密碼不一致'; return; }
+  localStorage.setItem('wt_admin_pw', nw);
+  msg.style.color='#4ade80'; msg.textContent='✅ 密碼已更新，請重新登入管理員';
+  setTimeout(closePwModal, 1500);
+  toast('ok','管理員密碼已變更');
+}
+
+function exportCSV() {
+  const logs=getLogs().filter(l=>!l.hidden&&inPeriod(l.ts,currentPeriod));
+  if (!logs.length) { toast('warn','此期間無紀錄可匯出'); return; }
+  const rows=logs.map(l=>{
+    const ts=new Date(l.ts).toLocaleString('zh-TW');
+    const st=l.cat==='op'?'操作':l.resolved?'已解決':'未解決';
+    const src=l.source==='auto'?'自動':l.source==='admin'?'管理員':'手動';
+    return [ts,l.title,`"${l.msg}"`,l.operator||'—',src,st,l.editedBy||''].join(',');
+  });
+  const csv=['時間,類型,說明,記錄者,來源,狀態,已更正',...rows].join('\n');
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(new Blob(['﻿'+csv],{type:'text/csv;charset=utf-8'}));
+  a.download='異常紀錄_'+new Date().toLocaleDateString('zh-TW').replace(/\//g,'-')+'.csv';
+  a.click(); toast('ok','CSV 匯出完成');
+}
+
+// ── NETWORK STATUS TOGGLE ──
+const NET_STATES = [
+  { cls:'s-online',  label:'線上',  msg:'線上' },
+  { cls:'s-warn',    label:'警告',  msg:'⚠ 警告' },
+  { cls:'s-offline', label:'離線',  msg:'❌ 離線' },
+];
+function toggleNetStatus(el) {
+  const cur = NET_STATES.findIndex(s => el.classList.contains(s.cls));
+  const next = NET_STATES[(cur + 1) % NET_STATES.length];
+  NET_STATES.forEach(s => el.classList.remove(s.cls));
+  el.classList.add(next.cls);
+  el.querySelector('.dot-circle').nextSibling
+    ? (el.childNodes[1].textContent = next.label)
+    : el.appendChild(document.createTextNode(next.label));
+  el.innerHTML = `<div class="dot-circle"></div>${next.label}`;
+  el.onclick = () => toggleNetStatus(el);
+  const name = el.closest('.net-item').querySelector('div > div').textContent;
+  if (next.cls === 's-offline') toast('error', `${name} 離線！`);
+  else if (next.cls === 's-warn') toast('warn', `${name} 警告狀態`);
+  else toast('ok', `${name} 已恢復線上`);
+}
+
+// ── RESPONSE PICKER ──
+const RESP_OPTIONS = [
+  { label:'OK',      cls:'resp-ok',      icon:'✅' },
+  { label:'ERROR',   cls:'resp-error',   icon:'❌' },
+  { label:'TIMEOUT', cls:'resp-timeout', icon:'⏱' },
+];
+
+let activePickerEl = null;
+
+function openRespPicker(el) {
+  // 關掉已開的
+  closeAllPickers();
+  activePickerEl = el;
+
+  const popup = document.createElement('div');
+  popup.className = 'resp-popup';
+  popup.id = 'resp-popup';
+
+  RESP_OPTIONS.forEach(opt => {
+    const btn = document.createElement('div');
+    btn.className = 'resp-option';
+    btn.style.cssText = `background:${opt.cls==='resp-ok'?'#22c55e22':opt.cls==='resp-error'?'#f8717122':'#f59e0b22'};color:${opt.cls==='resp-ok'?'#4ade80':opt.cls==='resp-error'?'#f87171':'#fbbf24'}`;
+    btn.textContent = opt.icon + ' ' + opt.label;
+    btn.onclick = (e) => {
+      e.stopPropagation();
+      setResp(el, opt.cls, opt.label);
+      closeAllPickers();
+    };
+    popup.appendChild(btn);
+  });
+
+  // 自訂輸入
+  const sep = document.createElement('div');
+  sep.style.cssText = 'border-top:1px solid #374151;margin:4px 0;';
+  popup.appendChild(sep);
+
+  const inp = document.createElement('input');
+  inp.className = 'resp-input';
+  inp.placeholder = '自訂文字…';
+  inp.onclick = e => e.stopPropagation();
+  inp.onkeydown = e => {
+    if (e.key === 'Enter' && inp.value.trim()) {
+      setResp(el, 'resp-custom', inp.value.trim());
+      closeAllPickers();
+    }
+  };
+  popup.appendChild(inp);
+
+  el.style.position = 'relative';
+  el.appendChild(popup);
+  setTimeout(() => inp.focus(), 50);
+}
+
+function setResp(el, cls, label) {
+  el.className = 'resp-tag ' + cls;
+  el.innerHTML = label + ' <span class="resp-edit-btn">▼</span>';
+  el.onclick = () => openRespPicker(el);
+  toast('ok', `回應已更新為：${label}`);
+}
+
+function closeAllPickers() {
+  document.querySelectorAll('.resp-popup').forEach(p => p.remove());
+  activePickerEl = null;
+}
+
+document.addEventListener('click', (e) => {
+  if (!e.target.closest('.resp-tag')) closeAllPickers();
+});
+
+// INIT
+function init() {
+  renderRaceSteps();
+  renderOrderedSteps('boot-steps', BOOT_DEF, 0, advanceBoot);
+  renderOrderedSteps('shut-steps', SHUT_DEF, 0, advanceShut);
+  updateTimerDisplay();
+  setState('idle');
+
+  // Auto reminder every 5 min if no activity
+  let lastActivity = Date.now();
+  document.addEventListener('click', () => lastActivity = Date.now());
+  setInterval(() => {
+    if (Date.now() - lastActivity > 300000) {
+      toast('warn', '系統閒置超過 5 分鐘，請確認狀態');
+      lastActivity = Date.now();
+    }
+  }, 60000);
+
+  // 初始化永久紀錄頁與異常彙總
+  renderRecords();
+  rebuildErrorLog();
+
+  // 每日操作開始自動寫一筆操作紀錄
+  const todayKey = 'wt_op_today_' + new Date().toDateString();
+  if (!localStorage.getItem(todayKey)) {
+    localStorage.setItem(todayKey, '1');
+    addLog('op', '📋 操作記錄', '系統啟動 — 工作日誌開始', 'auto');
+  }
+}
+if (sessionStorage.getItem('wt_auth')==='1') init();
+</script>
+</body>
+</html>

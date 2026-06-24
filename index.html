@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Work_TRACK — 登入</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    background: #0f1117;
+    color: #e2e8f0;
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .login-box {
+    background: #1a1d27;
+    border: 1px solid #2d3148;
+    border-radius: 16px;
+    padding: 48px 40px;
+    text-align: center;
+    width: 360px;
+    max-width: 90vw;
+  }
+  .logo { font-size: 36px; margin-bottom: 8px; }
+  .title { font-size: 22px; font-weight: 700; color: #7c8ef7; margin-bottom: 4px; }
+  .subtitle { font-size: 12px; color: #64748b; margin-bottom: 36px; letter-spacing: 1px; text-transform: uppercase; }
+  .input-group { margin-bottom: 16px; text-align: left; }
+  .input-group label { display: block; font-size: 11px; color: #94a3b8; margin-bottom: 6px; letter-spacing: 0.5px; }
+  .input-group input {
+    width: 100%;
+    padding: 12px 14px;
+    background: #12151f;
+    border: 1px solid #2d3148;
+    border-radius: 8px;
+    color: #e2e8f0;
+    font-size: 14px;
+    outline: none;
+    transition: border-color 0.15s;
+  }
+  .input-group input:focus { border-color: #3b5bdb; }
+  .login-btn {
+    width: 100%;
+    padding: 13px;
+    background: #3b5bdb;
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.15s;
+    margin-top: 4px;
+  }
+  .login-btn:hover { background: #2f4ac4; }
+  .status { margin-top: 14px; font-size: 12px; color: #f87171; min-height: 18px; }
+  .divider { border: none; border-top: 1px solid #2d3148; margin: 24px 0; }
+  .note { font-size: 11px; color: #475569; line-height: 1.6; }
+</style>
+</head>
+<body>
+<div class="login-box">
+  <div class="logo">⬡</div>
+  <div class="title">Work_TRACK</div>
+  <div class="subtitle">Marble Racing Live System</div>
+
+  <div class="input-group">
+    <label>您的姓名（中英文皆可）</label>
+    <input type="text" id="uname" placeholder="例：王小明 / Ming" maxlength="20"
+      onkeydown="if(event.key==='Enter')login()">
+  </div>
+  <button class="login-btn" onclick="login()">登入</button>
+  <div class="status" id="status"></div>
+
+  <hr class="divider">
+  <div class="note">請輸入姓名與密碼進入系統</div>
+</div>
+
+<script>
+  const PASSWORD = "0329";
+
+  function login() {
+    const name = document.getElementById('uname').value.trim();
+    if (!name) {
+      document.getElementById('status').textContent = '請填寫您的姓名。';
+      document.getElementById('uname').focus();
+      return;
+    }
+    sessionStorage.setItem('wt_auth', '1');
+    sessionStorage.setItem('wt_user', name);
+    window.location.href = 'operations.html';
+  }
+
+  // 已登入則直接跳轉
+  if (sessionStorage.getItem('wt_auth') === '1') {
+    window.location.href = 'operations.html';
+  }
+</script>
+</body>
+</html>

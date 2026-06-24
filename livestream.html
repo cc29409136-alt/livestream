@@ -1,0 +1,1585 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>直播統籌系統</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:'Segoe UI',system-ui,sans-serif;background:#f5f0e8;color:#2d2520;min-height:100vh;}
+
+/* ── 登入 ── */
+#auth-gate{display:flex;align-items:center;justify-content:center;min-height:100vh;flex-direction:column;gap:16px;background:linear-gradient(135deg,#fdf8f0 0%,#f0e8d8 100%);}
+.login-box{background:#ffffff;border:1px solid #e8ddd0;border-radius:20px;padding:48px 40px;text-align:center;width:380px;max-width:90vw;box-shadow:0 8px 40px #c8b49820;}
+.login-logo{font-size:44px;margin-bottom:10px;}
+.login-title{font-size:21px;font-weight:800;color:#7c5c3a;margin-bottom:4px;}
+.login-sub{font-size:11px;color:#b09880;margin-bottom:32px;letter-spacing:1px;text-transform:uppercase;}
+.login-label{display:block;font-size:11px;color:#9c8470;margin-bottom:6px;text-align:left;font-weight:600;}
+.login-input{width:100%;padding:12px 14px;background:#faf7f2;border:1.5px solid #e0d4c4;border-radius:10px;color:#2d2520;font-size:14px;outline:none;transition:border-color .15s;}
+.login-input:focus{border-color:#c4956a;}
+.login-btn{width:100%;padding:13px;background:#c4956a;color:#fff;border:none;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;margin-top:14px;transition:background .15s;}
+.login-btn:hover{background:#a97a52;}
+.login-err{font-size:12px;color:#c0503a;min-height:18px;margin-top:10px;}
+
+/* ── Topbar ── */
+#main-app{display:none;}
+.topbar{background:#ffffff;border-bottom:1px solid #e8ddd0;padding:0 24px;height:54px;display:flex;align-items:center;gap:14px;position:sticky;top:0;z-index:100;box-shadow:0 1px 6px #c8b49812;}
+.topbar-title{font-size:14px;font-weight:800;color:#7c5c3a;flex:1;}
+.topbar-right{display:flex;align-items:center;gap:10px;}
+.user-chip{font-size:11px;color:#7c5c3a;padding:4px 12px;background:#f5ede0;border:1px solid #e0ccb0;border-radius:20px;font-weight:600;}
+.month-chip{font-size:11px;color:#9c8470;padding:4px 10px;border:1px solid #e0d4c4;border-radius:20px;background:#faf7f2;}
+#clock{font-size:11px;color:#b09880;}
+.logout-btn{padding:5px 12px;border-radius:8px;border:1px solid #e0d4c4;background:transparent;color:#9c8470;font-size:11px;cursor:pointer;transition:all .15s;}
+.logout-btn:hover{border-color:#c0503a;color:#c0503a;}
+
+/* ── Nav ── */
+.nav{display:flex;gap:4px;padding:12px 24px 0;border-bottom:1px solid #e8ddd0;background:#ffffff;}
+.nav-btn{padding:8px 18px;border:none;background:transparent;color:#9c8470;font-size:12px;font-weight:600;cursor:pointer;border-radius:8px 8px 0 0;border-bottom:2px solid transparent;transition:all .15s;}
+.nav-btn.active{color:#7c5c3a;border-bottom-color:#c4956a;background:#f5ede055;}
+.nav-btn:hover:not(.active){color:#5c3c1e;background:#f5ede033;}
+
+/* ── Layout ── */
+.page{display:none;padding:20px 24px;}
+.page.active{display:block;}
+
+/* ── Cards ── */
+.card{background:#ffffff;border:1px solid #e8ddd0;border-radius:14px;padding:18px 20px;margin-bottom:12px;box-shadow:0 2px 8px #c8b49808;}
+.card-title{font-size:12px;font-weight:700;color:#9c8470;display:flex;align-items:center;gap:8px;margin-bottom:14px;text-transform:uppercase;letter-spacing:.5px;}
+
+/* ── 總覽 stats ── */
+.stats-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin-bottom:16px;}
+.stat-card{background:#ffffff;border:1px solid #e8ddd0;border-radius:12px;padding:16px;text-align:center;box-shadow:0 2px 8px #c8b49808;}
+.stat-val{font-size:28px;font-weight:800;margin-bottom:2px;}
+.stat-lbl{font-size:10px;color:#b09880;letter-spacing:.5px;}
+
+/* ── 場次卡片 ── */
+.sessions-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:12px;}
+.session-card{background:#ffffff;border:1px solid #e8ddd0;border-radius:14px;padding:18px;position:relative;transition:all .15s;box-shadow:0 2px 8px #c8b49808;}
+.session-card:hover{border-color:#c4956a44;box-shadow:0 4px 16px #c8b49818;}
+.session-card.done{border-left:3px solid #6aaa6a;}
+.session-card.today{border-color:#c4956a;box-shadow:0 0 0 2px #c4956a22;}
+.session-brand{font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;margin-bottom:6px;}
+.session-date{font-size:18px;font-weight:800;color:#2d2520;margin-bottom:2px;}
+.session-time{font-size:13px;color:#b09880;margin-bottom:8px;}
+.session-host{font-size:13px;color:#7c5c3a;font-weight:700;margin-bottom:12px;}
+.steps-row{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;}
+.step-chip{font-size:10px;padding:4px 10px;border-radius:20px;border:1.5px solid #e0d4c4;color:#b09880;background:#faf7f2;cursor:pointer;transition:all .15s;white-space:nowrap;user-select:none;font-weight:600;}
+.step-chip.done{background:#e8f5e8;border-color:#6aaa6a66;color:#3a7a3a;}
+.step-chip.warn{background:#fff8ec;border-color:#e0a040;color:#a06010;}
+.note-row{display:flex;gap:6px;margin-top:8px;}
+.note-input{flex:1;padding:7px 11px;background:#faf7f2;border:1.5px solid #e0d4c4;border-radius:8px;color:#5c3c1e;font-size:11px;outline:none;}
+.note-input:focus{border-color:#c4956a;}
+.note-btn{padding:7px 14px;background:#f5ede0;border:1px solid #e0ccb0;border-radius:8px;color:#7c5c3a;font-size:11px;cursor:pointer;font-weight:600;}
+.note-btn:hover{background:#e8ddd0;color:#5c3c1e;}
+.note-saved{font-size:10px;color:#b09880;margin-top:4px;min-height:14px;}
+.session-status{position:absolute;top:14px;right:14px;font-size:10px;padding:3px 9px;border-radius:10px;font-weight:600;}
+.status-pending{background:#f0ebe3;color:#b09880;}
+.status-live{background:#e8f5e8;color:#3a7a3a;animation:pulse 2s infinite;}
+.status-done{background:#f0ede8;color:#7c5c3a;}
+@keyframes pulse{0%,100%{opacity:1;}50%{opacity:.5;}}
+
+/* ── 流程步驟 ── */
+.flow-section{margin-bottom:24px;}
+.flow-group-title{font-size:11px;font-weight:700;color:#9c8470;text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;padding-bottom:8px;border-bottom:1.5px solid #e8ddd0;}
+.flow-steps{display:flex;flex-direction:column;gap:8px;}
+.flow-step{background:#ffffff;border:1px solid #e8ddd0;border-radius:12px;padding:16px 18px;display:flex;gap:14px;align-items:flex-start;box-shadow:0 1px 4px #c8b49806;}
+.step-num{width:30px;height:30px;border-radius:50%;background:#f5ede0;border:1.5px solid #e0ccb0;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;color:#7c5c3a;flex-shrink:0;}
+.step-body{flex:1;}
+.step-title{font-size:13px;font-weight:700;color:#2d2520;margin-bottom:4px;}
+.step-timing{font-size:10px;color:#c4956a;margin-bottom:6px;font-weight:600;}
+.step-actions{display:flex;flex-direction:column;gap:3px;}
+.step-action{font-size:11px;color:#9c8470;padding-left:12px;position:relative;}
+.step-action::before{content:'•';position:absolute;left:0;color:#c4956a;}
+.step-output{font-size:11px;color:#3a7a3a;margin-top:6px;padding:5px 10px;background:#e8f5e8;border-radius:6px;font-weight:600;}
+.step-warn{font-size:11px;color:#a06010;margin-top:4px;padding:5px 10px;background:#fff3e0;border-radius:6px;}
+
+/* ── 品牌分頁 ── */
+.brand-header{display:flex;align-items:center;gap:14px;margin-bottom:18px;}
+.brand-logo{width:48px;height:48px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:22px;}
+.brand-name{font-size:20px;font-weight:800;}
+.brand-count{font-size:11px;color:#b09880;margin-top:2px;}
+.filter-row{display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;}
+.filter-btn{padding:5px 14px;border-radius:20px;border:1.5px solid #e0d4c4;background:#faf7f2;color:#9c8470;font-size:11px;cursor:pointer;transition:all .15s;font-weight:600;}
+.filter-btn.active{border-color:#c4956a;background:#f5ede0;color:#7c5c3a;}
+
+/* ── 行事曆 ── */
+.cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;margin-bottom:16px;}
+.cal-head{text-align:center;font-size:10px;color:#b09880;font-weight:700;padding:6px;letter-spacing:.5px;}
+.cal-day{background:#faf7f2;border:1.5px solid #ede5d8;border-radius:8px;padding:7px;min-height:68px;font-size:11px;cursor:pointer;transition:all .15s;}
+.cal-day:hover{border-color:#c4956a66;background:#fff8f0;}
+.cal-day.has-event{border-color:#c4956a44;background:#fffaf5;}
+.cal-day.today-cell{border-color:#c4956a;background:#fff8f0;box-shadow:0 0 0 1px #c4956a33;}
+.cal-day.empty{background:transparent;border-color:transparent;}
+.cal-day-num{font-size:12px;font-weight:700;color:#9c8470;margin-bottom:4px;}
+.cal-day.today-cell .cal-day-num{color:#7c5c3a;}
+.cal-event{font-size:9px;padding:2px 6px;border-radius:4px;margin-bottom:2px;line-height:1.5;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:600;}
+.ev-yht{background:#ede8f8;color:#6040a0;}
+.ev-dm{background:#e8f5e8;color:#2a6a2a;}
+
+/* ── Toast ── */
+#toast{position:fixed;bottom:24px;right:24px;padding:11px 20px;border-radius:12px;font-size:12px;font-weight:700;z-index:999;opacity:0;transition:opacity .2s;pointer-events:none;box-shadow:0 4px 16px #00000018;}
+#toast.show{opacity:1;}
+#toast.ok{background:#e8f5e8;border:1.5px solid #6aaa6a66;color:#2a6a2a;}
+#toast.warn{background:#fff8ec;border:1.5px solid #e0a04066;color:#a06010;}
+#toast.error{background:#fdecea;border:1.5px solid #c0503a66;color:#c0503a;}
+
+/* ── 管理表單 ── */
+.form-label{font-size:11px;color:#9c8470;font-weight:600;margin-bottom:5px;}
+.form-input{width:100%;padding:9px 12px;border:1.5px solid #e0d4c4;border-radius:9px;background:#faf7f2;color:#2d2520;font-size:13px;outline:none;transition:border-color .15s;}
+.form-input:focus{border-color:#c4956a;}
+.adm-row{display:flex;align-items:center;gap:10px;padding:12px 14px;background:#faf7f2;border:1.5px solid #ede5d8;border-radius:10px;margin-bottom:8px;}
+.adm-row-brand{font-size:11px;font-weight:700;padding:3px 9px;border-radius:12px;white-space:nowrap;}
+.adm-row-date{font-size:13px;font-weight:700;color:#2d2520;white-space:nowrap;}
+.adm-row-time{font-size:12px;color:#9c8470;white-space:nowrap;}
+.adm-row-host{font-size:13px;color:#7c5c3a;font-weight:600;flex:1;}
+.adm-del-btn{padding:5px 12px;border:1.5px solid #e0c8c0;border-radius:8px;background:#fff5f5;color:#c0503a;font-size:11px;cursor:pointer;font-weight:600;white-space:nowrap;}
+.adm-del-btn:hover{background:#fdecea;}
+.adm-empty{text-align:center;color:#b09880;font-size:13px;padding:28px 0;}
+
+/* ── 本月任務 ── */
+.task-section{margin-bottom:20px;}
+.task-group-title{font-size:11px;font-weight:700;color:#9c8470;text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;padding-bottom:6px;border-bottom:1.5px solid #e8ddd0;}
+.task-item{display:flex;align-items:center;gap:12px;padding:12px 14px;background:#faf7f2;border:1.5px solid #ede5d8;border-radius:10px;margin-bottom:8px;transition:all .15s;cursor:pointer;}
+.task-item:hover{border-color:#c4956a44;background:#fff8f0;}
+.task-item.done{background:#f0faf0;border-color:#6aaa6a44;}
+.task-item.done .task-label{color:#3a7a3a;text-decoration:line-through;text-decoration-color:#6aaa6a66;}
+.task-check{width:22px;height:22px;border-radius:6px;border:2px solid #e0d4c4;display:flex;align-items:center;justify-content:center;font-size:13px;flex-shrink:0;transition:all .15s;background:#fff;}
+.task-item.done .task-check{background:#6aaa6a;border-color:#6aaa6a;color:#fff;}
+.task-label{font-size:13px;font-weight:600;color:#2d2520;flex:1;}
+.task-sub{font-size:11px;color:#9c8470;margin-top:2px;}
+.task-time{font-size:10px;color:#b09880;white-space:nowrap;}
+.task-badge{font-size:10px;padding:2px 8px;border-radius:10px;font-weight:700;white-space:nowrap;}
+.badge-done{background:#e8f5e8;color:#3a7a3a;}
+.badge-todo{background:#fff3e0;color:#a06010;}
+.badge-urgent{background:#fdecea;color:#c0503a;}
+
+/* ── 提醒 Banner ── */
+.remind-banner{display:none;background:linear-gradient(90deg,#fff8f0,#fdf5ec);border:2px solid #e0a04066;border-radius:12px;padding:14px 18px;margin-bottom:14px;align-items:center;gap:12px;}
+.remind-banner.show{display:flex;}
+.remind-banner-icon{font-size:24px;flex-shrink:0;}
+.remind-banner-text{flex:1;}
+.remind-banner-title{font-size:13px;font-weight:800;color:#7c5c3a;margin-bottom:2px;}
+.remind-banner-sub{font-size:11px;color:#9c8470;}
+.remind-banner-close{padding:5px 12px;border:1.5px solid #e0d4c4;border-radius:8px;background:#fff;color:#9c8470;font-size:11px;cursor:pointer;}
+
+/* ── PDF 上傳區 ── */
+.upload-zone{border:2px dashed #e0d4c4;border-radius:12px;padding:28px;text-align:center;background:#faf7f2;cursor:pointer;transition:all .2s;position:relative;}
+.upload-zone:hover,.upload-zone.drag{border-color:#c4956a;background:#fff8f0;}
+.upload-zone input[type=file]{position:absolute;inset:0;opacity:0;cursor:pointer;}
+.upload-zone-icon{font-size:36px;margin-bottom:8px;}
+.upload-zone-label{font-size:13px;color:#7c5c3a;font-weight:700;margin-bottom:4px;}
+.upload-zone-sub{font-size:11px;color:#b09880;}
+.pdf-result{margin-top:14px;background:#fff;border:1.5px solid #e8ddd0;border-radius:10px;padding:16px;max-height:320px;overflow-y:auto;font-size:12px;line-height:1.8;color:#2d2520;white-space:pre-wrap;display:none;}
+.pdf-parsed-row{display:flex;align-items:center;gap:10px;padding:9px 12px;background:#faf7f2;border:1.5px solid #ede5d8;border-radius:8px;margin-bottom:6px;}
+.pdf-parsed-brand{font-size:11px;font-weight:700;padding:2px 8px;border-radius:8px;}
+.pdf-import-btn{width:100%;padding:10px;background:#c4956a;color:#fff;border:none;border-radius:9px;font-size:13px;font-weight:700;cursor:pointer;margin-top:10px;display:none;}
+.pdf-import-btn:hover{background:#a97a52;}
+
+/* ── 封面圖上傳 ── */
+.cover-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:12px;margin-top:12px;}
+.cover-card{background:#faf7f2;border:1.5px solid #ede5d8;border-radius:10px;padding:12px;text-align:center;position:relative;}
+.cover-thumb{width:100%;aspect-ratio:16/9;object-fit:cover;border-radius:7px;background:#ede5d8;display:block;}
+.cover-thumb-empty{width:100%;aspect-ratio:16/9;border-radius:7px;background:#ede5d8;display:flex;align-items:center;justify-content:center;font-size:24px;color:#c4b0a0;}
+.cover-label{font-size:11px;font-weight:700;color:#7c5c3a;margin-top:8px;margin-bottom:4px;}
+.cover-status{font-size:10px;color:#b09880;}
+.cover-upload-btn{margin-top:8px;padding:5px 12px;border:1.5px solid #e0d4c4;border-radius:8px;background:#fff;color:#7c5c3a;font-size:11px;cursor:pointer;font-weight:600;}
+.cover-del-btn{position:absolute;top:6px;right:6px;width:20px;height:20px;border-radius:50%;background:#fdecea;border:none;color:#c0503a;font-size:11px;cursor:pointer;display:flex;align-items:center;justify-content:center;}
+
+/* ── 文案表單 ── */
+.sf-group{margin-bottom:10px;}
+.sf-label{font-size:10px;color:#9c8470;font-weight:700;margin-bottom:4px;letter-spacing:.3px;}
+.sf-input,.sf-textarea{width:100%;padding:7px 10px;border:1.5px solid #e0d4c4;border-radius:8px;background:#faf7f2;color:#2d2520;font-size:12px;outline:none;}
+.sf-input:focus,.sf-textarea:focus{border-color:#c4956a;}
+.sf-textarea{resize:vertical;line-height:1.7;font-family:'Segoe UI',system-ui,sans-serif;}
+.script-saved-badge{font-size:9px;background:#e8f5e8;color:#3a7a3a;border:1px solid #6aaa6a44;padding:2px 7px;border-radius:8px;cursor:pointer;flex-shrink:0;}
+
+/* ── Responsive ── */
+@media(max-width:600px){
+  .sessions-grid{grid-template-columns:1fr;}
+  .topbar{padding:0 14px;}
+  .page{padding:14px;}
+  .nav{padding:10px 14px 0;gap:2px;}
+  .nav-btn{padding:7px 12px;font-size:11px;}
+}
+</style>
+</head>
+<body>
+
+<!-- ── 登入 ── -->
+<div id="auth-gate">
+  <div class="login-box">
+    <div class="login-logo">📡</div>
+    <div class="login-title">直播統籌系統</div>
+    <div class="login-sub">Live Streaming Management</div>
+    <label class="login-label">您的姓名（中英文皆可）</label>
+    <input class="login-input" id="uname" type="text" placeholder="例：小明 / Ming" maxlength="20"
+      onkeydown="if(event.key==='Enter')doLogin()">
+    <button class="login-btn" onclick="doLogin()">進入系統</button>
+    <div class="login-err" id="login-err"></div>
+  </div>
+</div>
+
+<!-- ── 主系統 ── -->
+<div id="main-app">
+  <div class="topbar">
+    <span class="topbar-title">📡 直播統籌系統</span>
+    <div class="topbar-right">
+      <span id="clock"></span>
+      <span class="month-chip" id="cur-month">2025年7月</span>
+      <span class="user-chip" id="user-chip"></span>
+      <button class="logout-btn" onclick="doLogout()">登出</button>
+    </div>
+  </div>
+
+  <div class="nav">
+    <button class="nav-btn active" onclick="switchTab('overview',this)">📊 總覽</button>
+    <button class="nav-btn" onclick="switchTab('yht',this)">御熹堂</button>
+    <button class="nav-btn" onclick="switchTab('dm',this)">達摩本草</button>
+    <button class="nav-btn" onclick="switchTab('calendar',this)">📅 行事曆</button>
+    <button class="nav-btn" onclick="switchTab('flow',this)">📋 工作流程</button>
+    <button class="nav-btn" onclick="switchTab('monthly',this)">📋 本月任務</button>
+    <button class="nav-btn" onclick="switchTab('admin',this)" style="margin-left:auto;color:#c4956a;">⚙ 管理場次</button>
+  </div>
+
+  <!-- ══ 總覽 ══ -->
+  <div class="page active" id="page-overview">
+    <div class="stats-grid" id="stats-grid"></div>
+
+    <div class="card">
+      <div class="card-title">
+        📅 <span id="overview-month-label"></span> 全部場次
+        <div style="margin-left:auto;display:flex;gap:6px;align-items:center;">
+          <button onclick="shiftViewMonth(-1)" style="padding:3px 11px;border:1.5px solid #e0d4c4;border-radius:8px;background:#faf7f2;color:#7c5c3a;font-size:13px;cursor:pointer;">‹</button>
+          <button onclick="shiftViewMonth(1)"  style="padding:3px 11px;border:1.5px solid #e0d4c4;border-radius:8px;background:#faf7f2;color:#7c5c3a;font-size:13px;cursor:pointer;">›</button>
+        </div>
+      </div>
+      <div class="sessions-grid" id="all-sessions"></div>
+    </div>
+
+    <div style="text-align:right;margin-top:4px;">
+      <button onclick="previewTodayReminder()"
+        style="padding:6px 16px;border:1.5px solid #e0d4c4;border-radius:20px;background:#faf7f2;color:#9c8470;font-size:11px;cursor:pointer;">
+        🔔 預覽今日直播提醒
+      </button>
+    </div>
+  </div>
+
+  <!-- ══ 御熹堂 ══ -->
+  <div class="page" id="page-yht">
+    <div class="brand-header">
+      <div class="brand-logo" style="background:#7c8ef722;">🏛</div>
+      <div>
+        <div class="brand-name" style="color:#a5b4fc;">御熹堂</div>
+        <div class="brand-count" id="yht-count"></div>
+      </div>
+    </div>
+    <div class="filter-row" id="yht-filter"></div>
+    <div class="sessions-grid" id="yht-sessions"></div>
+  </div>
+
+  <!-- ══ 達摩本草 ══ -->
+  <div class="page" id="page-dm">
+    <div class="brand-header">
+      <div class="brand-logo" style="background:#22c55e1a;">🌿</div>
+      <div>
+        <div class="brand-name" style="color:#4ade80;">達摩本草</div>
+        <div class="brand-count" id="dm-count"></div>
+      </div>
+    </div>
+    <div class="filter-row" id="dm-filter"></div>
+    <div class="sessions-grid" id="dm-sessions"></div>
+  </div>
+
+  <!-- ══ 行事曆 ══ -->
+  <div class="page" id="page-calendar">
+    <div class="card">
+      <div class="card-title">
+        📅 <span id="cal-month-label"></span> 直播行事曆
+        <div style="margin-left:auto;display:flex;gap:6px;align-items:center;">
+          <button onclick="shiftViewMonth(-1)" style="padding:3px 11px;border:1.5px solid #e0d4c4;border-radius:8px;background:#faf7f2;color:#7c5c3a;font-size:13px;cursor:pointer;">‹</button>
+          <button onclick="shiftViewMonth(1)"  style="padding:3px 11px;border:1.5px solid #e0d4c4;border-radius:8px;background:#faf7f2;color:#7c5c3a;font-size:13px;cursor:pointer;">›</button>
+        </div>
+      </div>
+      <div class="cal-grid" id="cal-grid"></div>
+    </div>
+    <div class="card" id="cal-detail" style="display:none;">
+      <div class="card-title" id="cal-detail-title"></div>
+      <div class="sessions-grid" id="cal-detail-sessions"></div>
+    </div>
+  </div>
+
+  <!-- ══ 本月任務 ══ -->
+  <div class="page" id="page-monthly">
+
+    <!-- 提醒 Banner -->
+    <div class="remind-banner" id="remind-banner">
+      <div class="remind-banner-icon">🔔</div>
+      <div class="remind-banner-text">
+        <div class="remind-banner-title" id="remind-title"></div>
+        <div class="remind-banner-sub" id="remind-sub"></div>
+      </div>
+      <button class="remind-banner-close" onclick="closeBanner()">關閉</button>
+    </div>
+
+    <!-- 月份標題 -->
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;">
+      <button onclick="shiftTaskMonth(-1)" style="padding:4px 13px;border:1.5px solid #e0d4c4;border-radius:8px;background:#faf7f2;color:#7c5c3a;font-size:14px;cursor:pointer;">‹</button>
+      <span id="task-month-label" style="font-size:16px;font-weight:800;color:#7c5c3a;"></span>
+      <button onclick="shiftTaskMonth(1)"  style="padding:4px 13px;border:1.5px solid #e0d4c4;border-radius:8px;background:#faf7f2;color:#7c5c3a;font-size:14px;cursor:pointer;">›</button>
+      <span id="task-progress-chip" style="margin-left:8px;font-size:11px;padding:4px 12px;border-radius:20px;background:#f5ede0;border:1px solid #e0ccb0;color:#7c5c3a;font-weight:700;"></span>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;">
+
+      <!-- 左欄：月度任務清單 -->
+      <div>
+        <div class="task-section">
+          <div class="task-group-title">🗓 月初作業</div>
+          <div id="tasks-early"></div>
+        </div>
+        <div class="task-section">
+          <div class="task-group-title">📅 場次進行中</div>
+          <div id="tasks-during"></div>
+        </div>
+        <div class="task-section">
+          <div class="task-group-title">📝 月底結算</div>
+          <div id="tasks-end"></div>
+        </div>
+      </div>
+
+      <!-- 右欄：PDF 標單 + 封面圖 -->
+      <div>
+
+        <!-- 直播標單 PDF -->
+        <div class="card" style="margin-bottom:14px;">
+          <div class="card-title">📄 直播標單 PDF</div>
+          <div class="upload-zone" id="pdf-zone"
+            ondragover="event.preventDefault();this.classList.add('drag')"
+            ondragleave="this.classList.remove('drag')"
+            ondrop="handlePdfDrop(event)">
+            <input type="file" accept=".pdf" onchange="handlePdfFile(this.files[0])">
+            <div class="upload-zone-icon">📄</div>
+            <div class="upload-zone-label">拖放 PDF 或點擊上傳</div>
+            <div class="upload-zone-sub">直播標單、排程表等</div>
+          </div>
+          <div id="pdf-status" style="font-size:11px;color:#9c8470;margin-top:8px;min-height:16px;"></div>
+          <div id="pdf-result" class="pdf-result"></div>
+          <div id="pdf-parsed" style="margin-top:10px;"></div>
+          <button id="pdf-confirm-btn" class="pdf-import-btn" onclick="confirmPdfTask()">✅ 確認：當月直播標單已完成</button>
+        </div>
+
+        <!-- 封面圖 -->
+        <div class="card">
+          <div class="card-title">🖼 當月直播封面圖
+            <button onclick="document.getElementById('cover-upload-input').click()"
+              style="margin-left:auto;padding:4px 12px;border:1.5px solid #e0d4c4;border-radius:8px;background:#faf7f2;color:#7c5c3a;font-size:11px;cursor:pointer;font-weight:600;">
+              ＋ 上傳封面
+            </button>
+            <input type="file" id="cover-upload-input" accept="image/*" style="display:none" onchange="handleCoverUpload(this)">
+          </div>
+          <div id="cover-grid" class="cover-grid"></div>
+          <div id="cover-empty" style="text-align:center;color:#b09880;font-size:13px;padding:20px 0;">尚無封面圖，點右上角上傳</div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ 管理場次 ══ -->
+  <div class="page" id="page-admin">
+
+    <!-- 新增場次表單 -->
+    <div class="card" style="border-color:#e0ccb0;background:#fffdf8;">
+      <div class="card-title">➕ 新增直播場次</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px;">
+        <div>
+          <div class="form-label">品牌名稱</div>
+          <select id="adm-brand" onchange="syncBrandKey()" style="width:100%;padding:9px 12px;border:1.5px solid #e0d4c4;border-radius:9px;background:#faf7f2;color:#2d2520;font-size:13px;outline:none;">
+            <option value="御熹堂|yht">御熹堂</option>
+            <option value="達摩本草|dm">達摩本草</option>
+            <option value="__custom__|custom">＋ 自訂品牌</option>
+          </select>
+        </div>
+        <div id="custom-brand-wrap" style="display:none;">
+          <div class="form-label">自訂品牌名稱</div>
+          <input id="adm-brand-custom" class="form-input" placeholder="輸入品牌名稱">
+        </div>
+        <div>
+          <div class="form-label">直播日期</div>
+          <input id="adm-date" type="date" class="form-input">
+        </div>
+        <div>
+          <div class="form-label">開播時間</div>
+          <input id="adm-time" type="time" class="form-input" value="20:00">
+        </div>
+        <div>
+          <div class="form-label">主持人姓名</div>
+          <input id="adm-host" class="form-input" placeholder="例：年年、巧玉">
+        </div>
+      </div>
+      <button onclick="adminAddSession()"
+        style="padding:10px 28px;background:#c4956a;color:#fff;border:none;border-radius:9px;font-size:13px;font-weight:700;cursor:pointer;">
+        ＋ 新增場次
+      </button>
+      <div id="adm-msg" style="font-size:12px;min-height:18px;margin-top:10px;"></div>
+    </div>
+
+    <!-- 月份切換 -->
+    <div class="card">
+      <div class="card-title">📋 場次列表
+        <div style="margin-left:auto;display:flex;gap:6px;align-items:center;">
+          <button onclick="shiftMonth(-1)" style="padding:4px 12px;border:1.5px solid #e0d4c4;border-radius:8px;background:#faf7f2;color:#7c5c3a;font-size:13px;cursor:pointer;">‹</button>
+          <span id="adm-month-label" style="font-size:13px;font-weight:700;color:#7c5c3a;min-width:80px;text-align:center;"></span>
+          <button onclick="shiftMonth(1)"  style="padding:4px 12px;border:1.5px solid #e0d4c4;border-radius:8px;background:#faf7f2;color:#7c5c3a;font-size:13px;cursor:pointer;">›</button>
+          <button onclick="if(confirm('確定清除本月所有場次？'))clearMonthSessions()"
+            style="margin-left:8px;padding:4px 12px;border:1.5px solid #e0d0c0;border-radius:8px;background:#fff5ee;color:#c0503a;font-size:11px;cursor:pointer;font-weight:600;">
+            清除本月
+          </button>
+        </div>
+      </div>
+      <div id="adm-session-list"></div>
+    </div>
+
+  </div>
+
+  <!-- ══ 工作流程 ══ -->
+  <div class="page" id="page-flow">
+    <div class="card" style="margin-bottom:16px;background:#3b5bdb0a;border-color:#3b5bdb33;">
+      <div style="font-size:12px;color:#7c8ef7;line-height:1.9;">
+        <strong style="color:#a5b4fc;">工作核心：</strong>
+        主持人媒合 ✦ 排程協調 ✦ 預告設定 ✦ 開播確認 ✦ 勞報單回收<br>
+        <span style="color:#374151;">排除：跟播、對稿、數據分析、商品寄送、客服、請款追蹤、ROI責任</span>
+      </div>
+    </div>
+
+    <div class="flow-section">
+      <div class="flow-group-title">🗓 每月固定流程</div>
+      <div class="flow-steps" id="flow-monthly"></div>
+    </div>
+    <div class="flow-section">
+      <div class="flow-group-title">⚡ 開播前流程</div>
+      <div class="flow-steps" id="flow-pre"></div>
+    </div>
+    <div class="flow-section">
+      <div class="flow-group-title">🔴 直播當日流程</div>
+      <div class="flow-steps" id="flow-live"></div>
+    </div>
+    <div class="flow-section">
+      <div class="flow-group-title">📝 月底流程</div>
+      <div class="flow-steps" id="flow-end"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ 每日 12:00 直播提醒 Modal ══ -->
+<div id="daily-modal" style="display:none;position:fixed;inset:0;z-index:900;background:#00000055;align-items:flex-start;justify-content:center;padding-top:60px;">
+  <div style="background:#fff;border:2px solid #e0ccb0;border-radius:18px;width:520px;max-width:95vw;max-height:80vh;overflow-y:auto;box-shadow:0 12px 48px #00000022;">
+    <div style="background:linear-gradient(90deg,#fff8f0,#fdf0e0);padding:18px 22px;border-radius:16px 16px 0 0;border-bottom:1px solid #e8ddd0;display:flex;align-items:center;gap:12px;">
+      <span style="font-size:28px;">🔔</span>
+      <div style="flex:1;">
+        <div style="font-size:15px;font-weight:800;color:#7c5c3a;" id="daily-modal-title">今日直播提醒</div>
+        <div style="font-size:11px;color:#9c8470;" id="daily-modal-sub"></div>
+      </div>
+      <button onclick="closeDailyModal()" style="padding:6px 14px;border:1.5px solid #e0d4c4;border-radius:8px;background:#fff;color:#9c8470;font-size:12px;cursor:pointer;">關閉</button>
+    </div>
+    <div id="daily-modal-body" style="padding:18px 22px;"></div>
+  </div>
+</div>
+
+<!-- ══ 文案產生器 Modal ══ -->
+<div id="script-modal" style="display:none;position:fixed;inset:0;z-index:900;background:#00000055;align-items:flex-start;justify-content:center;padding-top:40px;overflow-y:auto;">
+  <div style="background:#fff;border:1.5px solid #e8ddd0;border-radius:18px;width:680px;max-width:95vw;margin-bottom:40px;box-shadow:0 12px 48px #00000022;">
+    <div style="background:linear-gradient(90deg,#fffaf5,#fdf5ec);padding:18px 24px;border-radius:16px 16px 0 0;border-bottom:1px solid #e8ddd0;display:flex;align-items:center;gap:12px;">
+      <span style="font-size:24px;">📝</span>
+      <div style="flex:1;">
+        <div style="font-size:15px;font-weight:800;color:#7c5c3a;" id="script-modal-title">直播文案產生器</div>
+        <div style="font-size:11px;color:#9c8470;" id="script-modal-sub"></div>
+      </div>
+      <button onclick="closeScriptModal()" style="padding:6px 14px;border:1.5px solid #e0d4c4;border-radius:8px;background:#fff;color:#9c8470;font-size:12px;cursor:pointer;">關閉</button>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:0;">
+      <!-- 左側：表單 -->
+      <div style="padding:20px 22px;border-right:1px solid #f0e8dc;">
+        <div style="font-size:11px;font-weight:700;color:#9c8470;margin-bottom:12px;text-transform:uppercase;letter-spacing:.5px;">填入資訊</div>
+        <div id="script-form"></div>
+        <button onclick="generateScript()" style="width:100%;padding:10px;background:#c4956a;color:#fff;border:none;border-radius:9px;font-size:13px;font-weight:700;cursor:pointer;margin-top:12px;">產生文案 ▶</button>
+      </div>
+      <!-- 右側：輸出 -->
+      <div style="padding:20px 22px;display:flex;flex-direction:column;gap:10px;">
+        <div style="font-size:11px;font-weight:700;color:#9c8470;text-transform:uppercase;letter-spacing:.5px;">產出文案</div>
+        <textarea id="script-output" style="flex:1;min-height:420px;width:100%;padding:12px;background:#faf7f2;border:1.5px solid #e0d4c4;border-radius:10px;font-size:12px;line-height:1.8;color:#2d2520;outline:none;resize:vertical;font-family:'Segoe UI',system-ui,sans-serif;" placeholder="點擊「產生文案」後在此顯示…" readonly></textarea>
+        <div style="display:flex;gap:8px;">
+          <button onclick="copyScript()" style="flex:1;padding:9px;border:1.5px solid #c4956a44;background:#f5ede0;color:#7c5c3a;border-radius:9px;font-size:12px;font-weight:700;cursor:pointer;">📋 複製</button>
+          <button onclick="saveScript()" style="flex:1;padding:9px;background:#c4956a;color:#fff;border:none;border-radius:9px;font-size:12px;font-weight:700;cursor:pointer;">💾 儲存至場次</button>
+        </div>
+        <div id="script-save-msg" style="font-size:11px;min-height:14px;text-align:center;color:#3a7a3a;"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Toast -->
+<div id="toast"></div>
+
+<script>
+// ══════════════════════════════════════════════
+// 場次動態管理（localStorage）
+// ══════════════════════════════════════════════
+const SESSIONS_STORE = 'ls_sessions_v1';
+const DEFAULT_SESSIONS = [
+  { id:'s1',  brand:'御熹堂',  brandKey:'yht', date:'2025-07-06', time:'23:30', host:'年年' },
+  { id:'s2',  brand:'御熹堂',  brandKey:'yht', date:'2025-07-07', time:'20:00', host:'年年' },
+  { id:'s3',  brand:'達摩本草', brandKey:'dm',  date:'2025-07-06', time:'23:30', host:'子葳' },
+  { id:'s4',  brand:'達摩本草', brandKey:'dm',  date:'2025-07-07', time:'20:00', host:'巧玉' },
+  { id:'s5',  brand:'達摩本草', brandKey:'dm',  date:'2025-07-07', time:'22:00', host:'嘉恩' },
+  { id:'s6',  brand:'達摩本草', brandKey:'dm',  date:'2025-07-17', time:'23:30', host:'Sunny' },
+  { id:'s7',  brand:'達摩本草', brandKey:'dm',  date:'2025-07-18', time:'12:00', host:'年年' },
+  { id:'s8',  brand:'達摩本草', brandKey:'dm',  date:'2025-07-18', time:'20:00', host:'巧玉' },
+  { id:'s9',  brand:'達摩本草', brandKey:'dm',  date:'2025-07-25', time:'20:00', host:'傑評' },
+];
+
+function getAllSessions() {
+  try {
+    const raw = localStorage.getItem(SESSIONS_STORE);
+    return raw ? JSON.parse(raw) : [...DEFAULT_SESSIONS];
+  } catch { return [...DEFAULT_SESSIONS]; }
+}
+function saveAllSessions(arr) {
+  localStorage.setItem(SESSIONS_STORE, JSON.stringify(arr));
+}
+// 初始化：若 localStorage 無資料，寫入預設值
+if (!localStorage.getItem(SESSIONS_STORE)) {
+  saveAllSessions(DEFAULT_SESSIONS);
+}
+
+// 當前瀏覽月份（管理頁用）
+let admYear  = new Date().getFullYear();
+let admMonth = new Date().getMonth(); // 0-based
+
+// 總覽月份：固定顯示當前選擇月份
+let viewYear  = new Date().getFullYear();
+let viewMonth = new Date().getMonth();
+
+const STEP_DEFS = [
+  { key:'notice',  label:'法規提醒', warn:true },
+  { key:'promo',   label:'預告設定', warn:false },
+  { key:'confirm', label:'開播確認', warn:false },
+  { key:'report',  label:'勞報單',   warn:false },
+];
+
+const FLOW_STEPS = {
+  monthly: [
+    { num:1, title:'接收次月直播需求', timing:'每月10日前',
+      actions:['確認品牌名稱、直播日期、時段、場次數量','評估主持人檔期','開始安排主持人'],
+      output:'主持人媒合名單' },
+    { num:2, title:'主持人媒合', timing:'STEP 1 完成後',
+      actions:['依品牌需求聯繫主持人','確認可接案、日期、時間、費用','與主持人確認品牌、日期、時段、合作內容'],
+      output:'主持人檔期確認' },
+    { num:3, title:'回覆品牌安排結果', timing:'媒合完成後',
+      actions:['通知品牌主持人姓名、日期、時間','如有異動：協調替代人選、更新排程'],
+      output:'最終直播排程表' },
+  ],
+  pre: [
+    { num:4, title:'預告設定', timing:'開播前',
+      actions:['至蝦皮後台設定直播標題、開播時間','填寫主持人資訊（如需）','確認預告已成功建立、時間正確'],
+      output:'直播預告完成' },
+    { num:5, title:'法規提醒', timing:'開播前',
+      actions:['向主持人提醒禁療效宣稱','禁誇大廣告','遵守品牌提供素材'],
+      output:'LINE提醒紀錄（免責依據）' },
+  ],
+  live: [
+    { num:6, title:'開播確認', timing:'開播前 5～10 分鐘',
+      actions:['確認主持人是否在線','確認設備是否正常','確認是否順利開播','未開播：立即聯絡主持人 + 通知品牌窗口'],
+      output:'開播確認紀錄' },
+    { num:7, title:'異常通報', timing:'發生異常時',
+      actions:['主持人遲到 → 通知品牌 + 聯繫主持人','未開播 → 同上','中途離線 → 同上'],
+      output:'通報 ＋ 協助聯絡（不需負責業績／救場／全程跟播）',
+      warn:true },
+  ],
+  end: [
+    { num:8, title:'勞報單回收', timing:'月底',
+      actions:['向主持人收取勞務報酬單','確認資料完整、簽名完整'],
+      output:'當月勞報單' },
+    { num:9, title:'繳交公司', timing:'當月場次結束後 7 日內',
+      actions:['交付勞報單正本給公司','公司收到後支付主持人費用'],
+      output:'文件完成交接' },
+    { num:10, title:'場次確認', timing:'月結',
+      actions:['確認公司提供的場次明細是否正確','確認應付服務費金額是否正確'],
+      output:'月結確認' },
+    { num:11, title:'簽回勞報單', timing:'月結',
+      actions:['簽署自身勞報單','回傳公司','公司執行匯款服務費'],
+      output:'收款完成' },
+  ],
+};
+
+// ══════════════════════════════════════════════
+// 狀態管理（localStorage）
+// ══════════════════════════════════════════════
+const STORE = 'ls_session_state';
+function getState() {
+  try { return JSON.parse(localStorage.getItem(STORE) || '{}'); } catch { return {}; }
+}
+function saveState(s) { localStorage.setItem(STORE, JSON.stringify(s)); }
+function getSession(id) { const s = getState(); return s[id] || { steps:{}, note:'' }; }
+function setSessionStep(id, stepKey, val) {
+  const s = getState();
+  if (!s[id]) s[id] = { steps:{}, note:'' };
+  s[id].steps[stepKey] = val;
+  saveState(s); renderAll();
+}
+function setSessionNote(id, note) {
+  const s = getState();
+  if (!s[id]) s[id] = { steps:{}, note:'' };
+  s[id].note = note;
+  saveState(s);
+}
+
+// ══════════════════════════════════════════════
+// 工具
+// ══════════════════════════════════════════════
+function today() { return new Date().toISOString().split('T')[0]; }
+function isToday(d) { return d === today(); }
+function isPast(d) {
+  const now = new Date(); now.setHours(0,0,0,0);
+  return new Date(d) < now;
+}
+function isSessionDone(id) {
+  const st = getSession(id);
+  return STEP_DEFS.every(sd => st.steps[sd.key]);
+}
+function fmtDate(dateStr) {
+  const d = new Date(dateStr + 'T00:00:00');
+  const days = ['日','一','二','三','四','五','六'];
+  return `7/${d.getDate()}（${days[d.getDay()]}）`;
+}
+function brandColor(key) {
+  return key === 'yht' ? '#a5b4fc' : '#4ade80';
+}
+function brandBg(key) {
+  return key === 'yht' ? '#7c8ef722' : '#22c55e1a';
+}
+
+function toast(type, msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg; el.className = 'show ' + type;
+  clearTimeout(el._t);
+  el._t = setTimeout(() => el.className = '', 2500);
+}
+
+// ══════════════════════════════════════════════
+// 登入
+// ══════════════════════════════════════════════
+function doLogin() {
+  const name = document.getElementById('uname').value.trim();
+  if (!name) { document.getElementById('login-err').textContent = '請填寫您的姓名'; return; }
+  sessionStorage.setItem('ls_auth', '1');
+  sessionStorage.setItem('ls_user', name);
+  document.getElementById('auth-gate').style.display = 'none';
+  document.getElementById('main-app').style.display = 'block';
+  document.getElementById('user-chip').textContent = '👤 ' + name;
+  initApp();
+}
+function doLogout() {
+  sessionStorage.removeItem('ls_auth');
+  sessionStorage.removeItem('ls_user');
+  location.reload();
+}
+if (sessionStorage.getItem('ls_auth') === '1') {
+  document.getElementById('auth-gate').style.display = 'none';
+  document.getElementById('main-app').style.display = 'block';
+  document.getElementById('user-chip').textContent = '👤 ' + (sessionStorage.getItem('ls_user') || '');
+}
+
+// ══════════════════════════════════════════════
+// 分頁切換
+// ══════════════════════════════════════════════
+function switchTab(id, btn) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('page-' + id).classList.add('active');
+  btn.classList.add('active');
+}
+
+// ══════════════════════════════════════════════
+// 場次卡片
+// ══════════════════════════════════════════════
+function renderSessionCard(s) {
+  const st    = getSession(s.id);
+  const done  = isSessionDone(s.id);
+  const tod   = isToday(s.date);
+  const past  = isPast(s.date);
+  const cls   = `session-card${done ? ' done' : ''}${tod ? ' today' : ''}`;
+
+  let statusLabel = '';
+  let statusCls   = '';
+  if (done)       { statusLabel = '✓ 完成'; statusCls = 'status-done'; }
+  else if (tod)   { statusLabel = '今日直播'; statusCls = 'status-live'; }
+  else if (past)  { statusLabel = '已過期'; statusCls = 'status-pending'; }
+  else            { statusLabel = '排程中'; statusCls = 'status-pending'; }
+
+  const stepsHtml = STEP_DEFS.map(sd => {
+    const checked = st.steps[sd.key];
+    const cls2 = checked ? 'step-chip done' : (sd.warn ? 'step-chip warn' : 'step-chip');
+    return `<span class="${cls2}" onclick="toggleStep('${s.id}','${sd.key}')" title="點擊切換狀態">
+      ${checked ? '✓' : '○'} ${sd.label}
+    </span>`;
+  }).join('');
+
+  const noteVal = st.note || '';
+
+  return `<div class="${cls}" id="card-${s.id}">
+    <span class="session-status ${statusCls}">${statusLabel}</span>
+    <div class="session-brand" style="color:${brandColor(s.brandKey)};">${s.brand}</div>
+    <div class="session-date">${fmtDate(s.date)}</div>
+    <div class="session-time">🕐 ${s.time}</div>
+    <div class="session-host">👤 ${s.host}</div>
+    <div class="steps-row">${stepsHtml}</div>
+    <div class="note-row">
+      <input class="note-input" id="note-${s.id}" placeholder="備註（預告連結、異常記錄…）" value="${noteVal}"
+        onblur="saveNote('${s.id}')" onkeydown="if(event.key==='Enter'){saveNote('${s.id}');this.blur();}">
+      <button class="note-btn" onclick="saveNote('${s.id}')">儲存</button>
+    </div>
+    <div class="note-saved" id="notesaved-${s.id}"></div>
+    <div style="margin-top:8px;display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
+      <button onclick="openScriptModal('${s.id}')"
+        style="padding:5px 12px;border:1.5px solid #c4956a44;background:#f5ede0;color:#7c5c3a;font-size:11px;border-radius:8px;cursor:pointer;font-weight:600;">
+        📝 直播文案
+      </button>
+      <label style="padding:5px 12px;border:1.5px solid #6aaa6a44;background:#f0faf0;color:#3a7a3a;font-size:11px;border-radius:8px;cursor:pointer;font-weight:600;">
+        📷 上傳封面
+        <input type="file" accept="image/*" style="display:none" onchange="handleCoverUpload(this,'${s.id}')">
+      </label>
+      ${getCoverForSession(s.id) ? `<span style="font-size:9px;background:#e8f5e8;color:#3a7a3a;border:1px solid #6aaa6a44;padding:2px 7px;border-radius:8px;">🖼 封面已上傳</span>` : ''}
+      ${getScriptForSession(s.id) ? `<span class="script-saved-badge" onclick="openScriptModal('${s.id}')">✓ 文案已儲存</span>` : ''}
+    </div>
+  </div>`;
+}
+
+function toggleStep(id, stepKey) {
+  const st  = getSession(id);
+  const cur = st.steps[stepKey] || false;
+  setSessionStep(id, stepKey, !cur);
+  const sd = STEP_DEFS.find(s => s.key === stepKey);
+  toast(cur ? 'warn' : 'ok', `${sd.label}：${cur ? '取消' : '✓ 完成'}`);
+}
+
+function saveNote(id) {
+  const el  = document.getElementById('note-' + id);
+  const msg = document.getElementById('notesaved-' + id);
+  if (!el) return;
+  setSessionNote(id, el.value);
+  msg.textContent = '已儲存 ' + new Date().toLocaleTimeString('zh-TW', { hour:'2-digit', minute:'2-digit' });
+  setTimeout(() => { if(msg) msg.textContent = ''; }, 3000);
+}
+
+// ══════════════════════════════════════════════
+// 渲染
+// ══════════════════════════════════════════════
+function renderAll() {
+  const SESSIONS = getAllSessions();
+  // 總覽：顯示當月場次
+  const monthStr = `${viewYear}-${String(viewMonth+1).padStart(2,'0')}`;
+  const monthSessions = SESSIONS.filter(s => s.date.startsWith(monthStr))
+                                .sort((a,b) => (a.date+a.time).localeCompare(b.date+b.time));
+  // 更新總覽標題
+  const ov = document.getElementById('overview-month-label');
+  if (ov) ov.textContent = `${viewYear}年${viewMonth+1}月`;
+  const calLabel = document.getElementById('cal-month-label');
+  if (calLabel) calLabel.textContent = `${viewYear}年${viewMonth+1}月`;
+
+  renderStats(monthSessions, SESSIONS);
+  renderSessions('all-sessions', monthSessions);
+
+  // 品牌分頁也依當月過濾
+  const allBrands = [...new Set(SESSIONS.map(s=>s.brand))];
+  renderBrandPage('yht', '御熹堂', monthSessions.filter(s=>s.brandKey==='yht'));
+  renderBrandPage('dm',  '達摩本草', monthSessions.filter(s=>s.brandKey==='dm'));
+  renderCalendar(viewYear, viewMonth, SESSIONS);
+  renderAdminList();
+}
+
+function renderStats(monthSessions, allSessions) {
+  const total    = monthSessions.length;
+  const doneCnt  = monthSessions.filter(s => isSessionDone(s.id)).length;
+  const todayCnt = monthSessions.filter(s => isToday(s.date)).length;
+  const pendCnt  = monthSessions.filter(s => !isSessionDone(s.id) && !isPast(s.date)).length;
+  const yhtCnt   = monthSessions.filter(s => s.brandKey === 'yht').length;
+  const dmCnt    = monthSessions.filter(s => s.brandKey === 'dm').length;
+
+  document.getElementById('stats-grid').innerHTML = [
+    { v: total,   l:'七月總場次',  c:'#7c8ef7' },
+    { v: yhtCnt,  l:'御熹堂場次',  c:'#a5b4fc' },
+    { v: dmCnt,   l:'達摩本草場次', c:'#4ade80' },
+    { v: todayCnt,l:'今日場次',    c:'#fbbf24' },
+    { v: doneCnt, l:'已完成',      c:'#22c55e' },
+    { v: pendCnt, l:'待處理',      c:'#f87171' },
+  ].map(s => `<div class="stat-card">
+    <div class="stat-val" style="color:${s.c};">${s.v}</div>
+    <div class="stat-lbl">${s.l}</div>
+  </div>`).join('');
+
+  document.getElementById('yht-count').textContent = `共 ${yhtCnt} 場`;
+  document.getElementById('dm-count').textContent  = `共 ${dmCnt} 場`;
+}
+
+function renderBrandPage(key, name, sessions) {
+  renderSessions(key+'-sessions', sessions);
+  const cnt = document.getElementById(key+'-count');
+  if (cnt) cnt.textContent = `共 ${sessions.length} 場`;
+}
+
+function renderSessions(containerId, list) {
+  const el = document.getElementById(containerId);
+  if (!el) return;
+  el.innerHTML = list.map(s => renderSessionCard(s)).join('');
+}
+
+// ══════════════════════════════════════════════
+// 行事曆
+// ══════════════════════════════════════════════
+function renderCalendar(year, month, allSessions) {
+  const grid = document.getElementById('cal-grid');
+  const heads = ['日','一','二','三','四','五','六'];
+  let html = heads.map(h => `<div class="cal-head">${h}</div>`).join('');
+
+  const firstDay    = new Date(year, month, 1).getDay();
+  const daysInMonth = new Date(year, month+1, 0).getDate();
+
+  for (let i = 0; i < firstDay; i++) html += `<div class="cal-day empty"></div>`;
+
+  for (let d = 1; d <= daysInMonth; d++) {
+    const dateStr    = `${year}-${String(month+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    const daySessions = allSessions.filter(s => s.date === dateStr);
+    const hasEvent   = daySessions.length > 0;
+    const isTod      = isToday(dateStr);
+    const evHtml     = daySessions.map(s => {
+      const cls = s.brandKey === 'yht' ? 'cal-event ev-yht' : 'cal-event ev-dm';
+      return `<div class="${cls}">${s.time} ${s.host}</div>`;
+    }).join('');
+    const cls = `cal-day${hasEvent?' has-event':''}${isTod?' today-cell':''}`;
+    html += `<div class="${cls}" onclick="showCalDetail('${dateStr}')">
+      <div class="cal-day-num">${d}</div>${evHtml}
+    </div>`;
+  }
+  grid.innerHTML = html;
+}
+
+function showCalDetail(dateStr) {
+  const daySessions = getAllSessions().filter(s => s.date === dateStr);
+  const detail = document.getElementById('cal-detail');
+  const title  = document.getElementById('cal-detail-title');
+  const cont   = document.getElementById('cal-detail-sessions');
+  if (!daySessions.length) { detail.style.display = 'none'; return; }
+  const d = new Date(dateStr + 'T00:00:00');
+  const days = ['日','一','二','三','四','五','六'];
+  title.textContent = `7/${d.getDate()}（${days[d.getDay()]}） 場次`;
+  cont.innerHTML = daySessions.map(s => renderSessionCard(s)).join('');
+  detail.style.display = 'block';
+  detail.scrollIntoView({ behavior:'smooth' });
+}
+
+// ══════════════════════════════════════════════
+// 管理功能
+// ══════════════════════════════════════════════
+function syncBrandKey() {
+  const val = document.getElementById('adm-brand').value;
+  document.getElementById('custom-brand-wrap').style.display =
+    val === '__custom__|custom' ? 'block' : 'none';
+}
+
+function adminAddSession() {
+  const brandRaw = document.getElementById('adm-brand').value;
+  const date     = document.getElementById('adm-date').value;
+  const time     = document.getElementById('adm-time').value;
+  const host     = document.getElementById('adm-host').value.trim();
+  const msg      = document.getElementById('adm-msg');
+
+  let brand, brandKey;
+  if (brandRaw === '__custom__|custom') {
+    brand    = document.getElementById('adm-brand-custom').value.trim();
+    brandKey = 'custom';
+    if (!brand) { msg.style.color='#c0503a'; msg.textContent='請輸入自訂品牌名稱'; return; }
+  } else {
+    [brand, brandKey] = brandRaw.split('|');
+  }
+  if (!date) { msg.style.color='#c0503a'; msg.textContent='請選擇直播日期'; return; }
+  if (!host) { msg.style.color='#c0503a'; msg.textContent='請輸入主持人姓名'; return; }
+
+  const sessions = getAllSessions();
+  const newSession = {
+    id:       's' + Date.now(),
+    brand, brandKey, date,
+    time:     time || '20:00',
+    host
+  };
+  sessions.push(newSession);
+  saveAllSessions(sessions);
+
+  // 清空表單
+  document.getElementById('adm-date').value = '';
+  document.getElementById('adm-host').value = '';
+  document.getElementById('adm-brand-custom').value = '';
+
+  msg.style.color = '#3a7a3a';
+  msg.textContent = `✅ 已新增：${brand} ${date} ${time} ${host}`;
+  setTimeout(() => msg.textContent = '', 3000);
+
+  // 切換管理頁面月份到新增的月份
+  const d = new Date(date);
+  admYear  = d.getFullYear();
+  admMonth = d.getMonth();
+  viewYear  = admYear;
+  viewMonth = admMonth;
+
+  renderAll();
+  toast('ok', `新增場次：${brand} ${date}`);
+}
+
+function deleteSession(id) {
+  if (!confirm('確定刪除此場次？')) return;
+  const sessions = getAllSessions().filter(s => s.id !== id);
+  saveAllSessions(sessions);
+  renderAll();
+  toast('warn', '已刪除場次');
+}
+
+function shiftMonth(dir) {
+  admMonth += dir;
+  if (admMonth > 11) { admMonth = 0; admYear++;  }
+  if (admMonth < 0)  { admMonth = 11; admYear--; }
+  viewYear  = admYear;
+  viewMonth = admMonth;
+  renderAll();
+}
+
+function clearMonthSessions() {
+  const monthStr = `${admYear}-${String(admMonth+1).padStart(2,'0')}`;
+  const sessions = getAllSessions().filter(s => !s.date.startsWith(monthStr));
+  saveAllSessions(sessions);
+  renderAll();
+  toast('warn', `已清除 ${admYear}年${admMonth+1}月 所有場次`);
+}
+
+function renderAdminList() {
+  const monthStr  = `${admYear}-${String(admMonth+1).padStart(2,'0')}`;
+  const sessions  = getAllSessions()
+    .filter(s => s.date.startsWith(monthStr))
+    .sort((a,b) => (a.date+a.time).localeCompare(b.date+b.time));
+
+  const lbl = document.getElementById('adm-month-label');
+  if (lbl) lbl.textContent = `${admYear}年${admMonth+1}月`;
+
+  const el = document.getElementById('adm-session-list');
+  if (!el) return;
+  if (!sessions.length) {
+    el.innerHTML = `<div class="adm-empty">本月尚無場次，請在上方新增</div>`;
+    return;
+  }
+  el.innerHTML = sessions.map(s => {
+    const color = s.brandKey==='yht' ? '#6040a0' : s.brandKey==='dm' ? '#2a6a2a' : '#7c5c3a';
+    const bg    = s.brandKey==='yht' ? '#ede8f8' : s.brandKey==='dm' ? '#e8f5e8' : '#f5ede0';
+    return `<div class="adm-row">
+      <span class="adm-row-brand" style="background:${bg};color:${color};">${s.brand}</span>
+      <span class="adm-row-date">${s.date}</span>
+      <span class="adm-row-time">${s.time}</span>
+      <span class="adm-row-host">👤 ${s.host}</span>
+      <button class="adm-del-btn" onclick="deleteSession('${s.id}')">刪除</button>
+    </div>`;
+  }).join('');
+}
+
+// 月份切換（總覽 / 行事曆 頁頂部）
+function shiftViewMonth(dir) {
+  viewMonth += dir;
+  if (viewMonth > 11) { viewMonth = 0; viewYear++;  }
+  if (viewMonth < 0)  { viewMonth = 11; viewYear--; }
+  admYear  = viewYear;
+  admMonth = viewMonth;
+  renderAll();
+}
+
+// ══════════════════════════════════════════════
+// 工作流程渲染
+// ══════════════════════════════════════════════
+function renderFlowStep(s) {
+  return `<div class="flow-step">
+    <div class="step-num">${s.num}</div>
+    <div class="step-body">
+      <div class="step-title">STEP ${s.num}｜${s.title}</div>
+      ${s.timing ? `<div class="step-timing">⏱ ${s.timing}</div>` : ''}
+      <div class="step-actions">
+        ${s.actions.map(a => `<div class="step-action">${a}</div>`).join('')}
+      </div>
+      <div class="step-output">✔ 產出：${s.output}</div>
+      ${s.warn ? `<div class="step-warn">⚠ 僅需通報協助，不需負責業績／救場</div>` : ''}
+    </div>
+  </div>`;
+}
+
+function renderFlow() {
+  document.getElementById('flow-monthly').innerHTML = FLOW_STEPS.monthly.map(renderFlowStep).join('');
+  document.getElementById('flow-pre').innerHTML     = FLOW_STEPS.pre.map(renderFlowStep).join('');
+  document.getElementById('flow-live').innerHTML    = FLOW_STEPS.live.map(renderFlowStep).join('');
+  document.getElementById('flow-end').innerHTML     = FLOW_STEPS.end.map(renderFlowStep).join('');
+}
+
+// ══════════════════════════════════════════════
+// 時鐘
+// ══════════════════════════════════════════════
+function updateClock() {
+  const el = document.getElementById('clock');
+  if (el) el.textContent = new Date().toLocaleTimeString('zh-TW', { hour:'2-digit', minute:'2-digit' });
+}
+
+// ══════════════════════════════════════════════
+// 初始化
+// ══════════════════════════════════════════════
+function initApp() {
+  renderAll();
+  renderFlow();
+  renderTaskPage();
+  updateClock();
+  setInterval(updateClock, 30000);
+  requestNotify();
+  scheduleDailyReminder();
+
+  // 若今天有場次且現在是 12:00 之後，啟動時也檢查一次
+  const h = new Date().getHours();
+  if (h >= 12 && getAllSessions().some(s => isToday(s.date))) {
+    const shownKey = 'ls_daily_shown_' + today();
+    if (!sessionStorage.getItem(shownKey)) {
+      sessionStorage.setItem(shownKey, '1');
+      setTimeout(checkTodayAndRemind, 1500);
+    }
+  }
+}
+
+if (sessionStorage.getItem('ls_auth') === '1') initApp();
+
+// ══════════════════════════════════════════════
+// 文案產生器
+// ══════════════════════════════════════════════
+const SCRIPT_STORE = 'ls_scripts_v1';
+let currentScriptSessionId = null;
+
+function getScriptForSession(id) {
+  try { return JSON.parse(localStorage.getItem(SCRIPT_STORE)||'{}')[id] || null; }
+  catch { return null; }
+}
+function saveScriptForSession(id, text) {
+  const all = JSON.parse(localStorage.getItem(SCRIPT_STORE)||'{}');
+  all[id] = text;
+  localStorage.setItem(SCRIPT_STORE, JSON.stringify(all));
+}
+
+// 品牌預設登入資訊
+const BRAND_DEFAULTS = {
+  '御熹堂':  { ig:'@yuhsitang_official', shopee:'https://tw.shp.ee/', acc:'yuhsitang:hsinpei',  pw:'請填入' },
+  '達摩本草': { ig:'@damokampo_official',  shopee:'https://tw.shp.ee/AcZSyee', acc:'damokampo:hsinpei', pw:'Qw0986567976' },
+};
+
+function openScriptModal(sessionId) {
+  const s = getAllSessions().find(s => s.id === sessionId);
+  if (!s) return;
+  currentScriptSessionId = sessionId;
+
+  document.getElementById('script-modal-title').textContent = `📝 直播文案產生器`;
+  document.getElementById('script-modal-sub').textContent   = `${s.brand}｜${s.date}｜${s.time}｜${s.host}`;
+
+  const def = BRAND_DEFAULTS[s.brand] || { ig:'', shopee:'', acc:'', pw:'' };
+  const saved = getScriptForSession(sessionId);
+
+  document.getElementById('script-form').innerHTML = `
+    <div class="sf-group"><div class="sf-label">🎙 主持人</div>
+      <input class="sf-input" id="sf-host" value="${s.host}"></div>
+    <div class="sf-group"><div class="sf-label">🕐 時間</div>
+      <input class="sf-input" id="sf-time" value="${s.time}"></div>
+    <div class="sf-group"><div class="sf-label">🏷 品牌</div>
+      <input class="sf-input" id="sf-brand" value="${s.brand}"></div>
+    <div class="sf-group"><div class="sf-label">📸 IG 帳號</div>
+      <input class="sf-input" id="sf-ig" value="${def.ig}"></div>
+    <div class="sf-group"><div class="sf-label">🔗 蝦皮連結</div>
+      <input class="sf-input" id="sf-shopee" value="${def.shopee}"></div>
+    <div class="sf-group"><div class="sf-label">🔐 直播帳號</div>
+      <input class="sf-input" id="sf-acc" value="${def.acc}"></div>
+    <div class="sf-group"><div class="sf-label">🔐 直播密碼</div>
+      <input class="sf-input" id="sf-pw" value="${def.pw}"></div>
+    <div class="sf-group"><div class="sf-label">🔥 主推商品（每行一項）</div>
+      <textarea class="sf-textarea" id="sf-products" rows="5" placeholder="(1.) 商品名稱&#10;(2.) 商品名稱"></textarea></div>
+    <div class="sf-group"><div class="sf-label">💡 主推重點</div>
+      <input class="sf-input" id="sf-focus" placeholder="例：魚油改推「9入大組」"></div>
+    <div class="sf-group"><div class="sf-label">🎁 限時活動日期</div>
+      <input class="sf-input" id="sf-act-date" placeholder="例：${s.date.slice(5).replace('-','/')}"></div>
+    <div class="sf-group"><div class="sf-label">🎁 限時活動內容（每行一項）</div>
+      <textarea class="sf-textarea" id="sf-activities" rows="4" placeholder="⠂商品 👉 贈：贈品"></textarea></div>
+    <div class="sf-group"><div class="sf-label">📌 其他備注</div>
+      <textarea class="sf-textarea" id="sf-notes" rows="2" placeholder="例：特別提醒事項"></textarea></div>
+  `;
+
+  const output = document.getElementById('script-output');
+  output.value = saved || '';
+
+  const modal = document.getElementById('script-modal');
+  modal.style.display = 'flex';
+}
+
+function closeScriptModal() {
+  document.getElementById('script-modal').style.display = 'none';
+  currentScriptSessionId = null;
+  renderAll();
+}
+
+function generateScript() {
+  const host      = document.getElementById('sf-host').value.trim();
+  const time      = document.getElementById('sf-time').value.trim();
+  const brand     = document.getElementById('sf-brand').value.trim();
+  const ig        = document.getElementById('sf-ig').value.trim();
+  const shopee    = document.getElementById('sf-shopee').value.trim();
+  const acc       = document.getElementById('sf-acc').value.trim();
+  const pw        = document.getElementById('sf-pw').value.trim();
+  const products  = document.getElementById('sf-products').value.trim();
+  const focus     = document.getElementById('sf-focus').value.trim();
+  const actDate   = document.getElementById('sf-act-date').value.trim();
+  const activities= document.getElementById('sf-activities').value.trim();
+  const notes     = document.getElementById('sf-notes').value.trim();
+
+  const prodLines = products
+    ? products.split('\n').map((l,i) => l.startsWith('(') ? l : `(${i+1}.) ${l}`).join('\n')
+    : '（請填入主推商品）';
+
+  const focusLine = focus ? `👉（重點：${focus}）` : '';
+
+  const actBlock = actDate && activities
+    ? `\n🎁 限時活動（指定日期變價）\n📅 ${actDate}\n${activities.split('\n').map(l=>l.startsWith('⠂')?l:`⠂${l}`).join('\n')}\n\n(放 "限時活動圖" 後)\n‼️留意：今日>會有「限時活動喔」如上述圖示`
+    : '';
+
+  const notesBlock = notes ? `\n\n📌 ${notes}` : '';
+
+  const script = `🎙️ ${host}｜${time}｜${brand}
+━━━━━━━━━━━━━━━━
+⠂發佈「預告限動」
+⠂Tag IG：${ig}
+⠂放上蝦皮連結🔗
+${shopee}
+
+🔐 直播登入資訊
+⠂帳號：${acc}
+⠂密碼：${pw}
+
+🔥主推商品（全掛＋主推${products.split('\n').filter(Boolean).length}款）
+${focusLine}
+${prodLines}
+${actBlock}
+
+‼️記得!!!!!Push觀眾 "加入品牌會員"
+👉會不定期的發會員券跟累積點數可以換商品。${notesBlock}`;
+
+  document.getElementById('script-output').value = script;
+}
+
+function copyScript() {
+  const text = document.getElementById('script-output').value;
+  if (!text) { toast('warn','請先產生文案'); return; }
+  navigator.clipboard.writeText(text).then(() => toast('ok','已複製到剪貼簿'));
+}
+
+function saveScript() {
+  const text = document.getElementById('script-output').value;
+  if (!text || !currentScriptSessionId) { toast('warn','請先產生文案'); return; }
+  saveScriptForSession(currentScriptSessionId, text);
+  document.getElementById('script-save-msg').textContent = '✅ 已儲存';
+  setTimeout(() => { document.getElementById('script-save-msg').textContent = ''; }, 2000);
+  toast('ok','文案已儲存至場次');
+}
+
+// ══════════════════════════════════════════════
+// 每日 12:00 直播提醒
+// ══════════════════════════════════════════════
+function scheduleDailyReminder() {
+  const now   = new Date();
+  const next  = new Date(now);
+  next.setHours(12, 0, 0, 0);
+  if (now >= next) next.setDate(next.getDate() + 1);
+  const delay = next - now;
+  setTimeout(() => {
+    checkTodayAndRemind();
+    setInterval(checkTodayAndRemind, 24 * 60 * 60 * 1000);
+  }, delay);
+}
+
+function checkTodayAndRemind() {
+  const todaySessions = getAllSessions()
+    .filter(s => isToday(s.date))
+    .sort((a,b) => a.time.localeCompare(b.time));
+  if (!todaySessions.length) return;
+
+  // 組成提醒內容
+  const body = document.getElementById('daily-modal-body');
+  const d    = new Date();
+  document.getElementById('daily-modal-sub').textContent =
+    `${d.getFullYear()}年${d.getMonth()+1}月${d.getDate()}日｜今日共 ${todaySessions.length} 場`;
+
+  body.innerHTML = todaySessions.map((s, idx) => {
+    const script = getScriptForSession(s.id);
+    const cover  = getCoverForSession(s.id);
+    const color  = s.brandKey==='yht'?'#6040a0':s.brandKey==='dm'?'#2a6a2a':'#7c5c3a';
+    const bg     = s.brandKey==='yht'?'#ede8f8':s.brandKey==='dm'?'#e8f5e8':'#f5ede0';
+
+    const coverHtml = cover
+      ? `<div style="margin-bottom:12px;">
+           <div style="font-size:10px;font-weight:700;color:${color};margin-bottom:6px;letter-spacing:.5px;">🖼 直播封面圖</div>
+           <img src="${cover.src}" alt="${cover.name}"
+             style="width:100%;max-height:180px;object-fit:cover;border-radius:8px;border:1.5px solid ${color}33;">
+         </div>`
+      : `<div style="font-size:11px;color:#b09880;background:#faf7f2;border-radius:7px;padding:8px 12px;margin-bottom:10px;">
+           📷 尚無封面圖
+           <label style="margin-left:8px;padding:3px 10px;border:1.5px solid #e0d4c4;border-radius:6px;background:#fff;color:#7c5c3a;font-size:10px;font-weight:700;cursor:pointer;">
+             立即上傳
+             <input type="file" accept="image/*" style="display:none" onchange="handleCoverUpload(this,'${s.id}');closeDailyModal();setTimeout(checkTodayAndRemind,800)">
+           </label>
+         </div>`;
+
+    const scriptId = `daily-script-${idx}`;
+    const scriptHtml = script
+      ? `<div style="font-size:10px;font-weight:700;color:${color};margin-bottom:6px;letter-spacing:.5px;">📝 直播文案</div>
+         <pre id="${scriptId}" style="font-size:11px;line-height:1.8;color:#2d2520;white-space:pre-wrap;background:#fff;border-radius:7px;padding:10px 12px;max-height:220px;overflow-y:auto;border:1px solid #e8ddd0;">${script}</pre>
+         <button onclick="navigator.clipboard.writeText(document.getElementById('${scriptId}').textContent).then(()=>toast('ok','已複製'))"
+           style="margin-top:8px;padding:6px 16px;background:#c4956a;color:#fff;border:none;border-radius:7px;font-size:11px;font-weight:700;cursor:pointer;">📋 複製文案</button>`
+      : `<div style="font-size:11px;color:#9c8470;padding:8px 0;">尚無文案</div>
+         <button onclick="closeDailyModal();openScriptModal('${s.id}')"
+           style="padding:6px 14px;background:#f5ede0;color:#7c5c3a;border:1.5px solid #e0ccb0;border-radius:7px;font-size:11px;font-weight:700;cursor:pointer;">📝 前往產生文案</button>`;
+
+    return `<div style="background:${bg};border-radius:12px;padding:16px;margin-bottom:14px;">
+      <div style="font-size:15px;font-weight:800;color:${color};margin-bottom:12px;">
+        🎙️ ${s.host}｜${s.time}｜${s.brand}
+      </div>
+      ${coverHtml}
+      ${scriptHtml}
+    </div>`;
+  }).join('');
+
+  document.getElementById('daily-modal').style.display = 'flex';
+
+  // 瀏覽器推播
+  if (Notification.permission === 'granted') {
+    const names = todaySessions.map(s=>`${s.time} ${s.host}(${s.brand})`).join('、');
+    new Notification('🔔 今日直播提醒', { body: names });
+  }
+}
+
+function closeDailyModal() {
+  document.getElementById('daily-modal').style.display = 'none';
+}
+
+// 手動觸發今日提醒（供測試用）
+function previewTodayReminder() {
+  const todaySessions = getAllSessions().filter(s => isToday(s.date));
+  if (!todaySessions.length) { toast('warn','今日無直播場次'); return; }
+  checkTodayAndRemind();
+}
+
+// ══════════════════════════════════════════════
+// 本月任務系統
+// ══════════════════════════════════════════════
+const TASK_STORE   = 'ls_tasks_v1';
+const COVER_STORE  = 'ls_covers_v1';
+let taskYear  = new Date().getFullYear();
+let taskMonth = new Date().getMonth();
+
+const TASK_DEFS = {
+  early: [
+    { key:'schedule_received', label:'接收次月直播需求',     sub:'品牌提供日期、場次、時段' },
+    { key:'pdf_done',          label:'當月直播標單已完成',   sub:'PDF已上傳並確認內容' },
+    { key:'host_matched',      label:'主持人媒合完成',       sub:'所有場次主持人確認' },
+    { key:'brand_notified',    label:'排程回覆品牌',         sub:'通知品牌主持人與時段' },
+  ],
+  during: [
+    { key:'cover_done',    label:'當月直播封面圖已確認', sub:'所有場次封面圖上傳完成' },
+    { key:'promo_set',     label:'預告設定完成',         sub:'蝦皮後台直播預告已設定' },
+    { key:'law_reminded',  label:'法規提醒已發送',       sub:'LINE提醒主持人禁療效宣稱' },
+    { key:'live_confirmed',label:'開播確認完成',         sub:'所有場次確認順利開播' },
+  ],
+  end: [
+    { key:'report_collected', label:'勞報單全數回收',   sub:'主持人簽名文件齊全' },
+    { key:'report_submitted', label:'勞報單已繳交公司', sub:'場次結束後7日內' },
+    { key:'session_verified', label:'場次明細確認',     sub:'月結場次數與金額核對' },
+    { key:'fee_signed',       label:'自身勞報單簽回',   sub:'收款完成' },
+  ],
+};
+
+function getTaskKey(y, m) { return `${y}-${String(m+1).padStart(2,'0')}`; }
+
+function getTasks(y, m) {
+  try {
+    const all = JSON.parse(localStorage.getItem(TASK_STORE)||'{}');
+    return all[getTaskKey(y,m)] || {};
+  } catch { return {}; }
+}
+function setTask(y, m, key, val) {
+  const all = JSON.parse(localStorage.getItem(TASK_STORE)||'{}');
+  const k   = getTaskKey(y,m);
+  if (!all[k]) all[k] = {};
+  all[k][key] = val ? new Date().toISOString() : null;
+  localStorage.setItem(TASK_STORE, JSON.stringify(all));
+  renderTaskPage();
+}
+
+function toggleTask(key) {
+  const tasks = getTasks(taskYear, taskMonth);
+  setTask(taskYear, taskMonth, key, !tasks[key]);
+  const def = Object.values(TASK_DEFS).flat().find(d=>d.key===key);
+  if (!tasks[key] && def) showBannerMsg(`✅ ${def.label}`, '任務已標記完成！');
+  checkAllDone();
+}
+
+function checkAllDone() {
+  const tasks = getTasks(taskYear, taskMonth);
+  const allDefs = Object.values(TASK_DEFS).flat();
+  const done = allDefs.filter(d=>tasks[d.key]).length;
+  if (done === allDefs.length) {
+    showBannerMsg('🎉 本月所有任務已完成！', `${taskYear}年${taskMonth+1}月 — 無待辦事項遺漏`);
+    if (Notification.permission === 'granted') {
+      new Notification('直播統籌系統', { body:`${taskYear}年${taskMonth+1}月 所有任務已完成！`, icon:'📡' });
+    }
+  }
+}
+
+function showBannerMsg(title, sub) {
+  document.getElementById('remind-title').textContent = title;
+  document.getElementById('remind-sub').textContent   = sub;
+  document.getElementById('remind-banner').classList.add('show');
+}
+function closeBanner() {
+  document.getElementById('remind-banner').classList.remove('show');
+}
+
+function renderTaskPage() {
+  const tasks   = getTasks(taskYear, taskMonth);
+  const allDefs = Object.values(TASK_DEFS).flat();
+  const done    = allDefs.filter(d=>tasks[d.key]).length;
+  const total   = allDefs.length;
+
+  document.getElementById('task-month-label').textContent = `${taskYear}年${taskMonth+1}月 待辦清單`;
+  const chip = document.getElementById('task-progress-chip');
+  chip.textContent = `${done} / ${total} 完成`;
+  chip.style.background = done===total ? '#e8f5e8' : done>0 ? '#fff8ec' : '#fdecea';
+  chip.style.color       = done===total ? '#3a7a3a' : done>0 ? '#a06010' : '#c0503a';
+  chip.style.borderColor = done===total ? '#6aaa6a44' : done>0 ? '#e0a04044' : '#c0503a44';
+
+  ['early','during','end'].forEach(group => {
+    const el = document.getElementById('tasks-'+group);
+    if (!el) return;
+    el.innerHTML = TASK_DEFS[group].map(def => {
+      const isDone = !!tasks[def.key];
+      const ts     = tasks[def.key] ? new Date(tasks[def.key]).toLocaleDateString('zh-TW') : '';
+      return `<div class="task-item${isDone?' done':''}" onclick="toggleTask('${def.key}')">
+        <div class="task-check">${isDone?'✓':''}</div>
+        <div style="flex:1;">
+          <div class="task-label">${def.label}</div>
+          <div class="task-sub">${def.sub}</div>
+        </div>
+        ${isDone ? `<span class="task-time">${ts}</span>` : `<span class="task-badge badge-todo">待辦</span>`}
+      </div>`;
+    }).join('');
+  });
+
+  renderCovers();
+}
+
+function shiftTaskMonth(dir) {
+  taskMonth += dir;
+  if (taskMonth>11){taskMonth=0;taskYear++;}
+  if (taskMonth<0) {taskMonth=11;taskYear--;}
+  renderTaskPage();
+}
+
+// ── 請求通知權限 ──
+function requestNotify() {
+  if ('Notification' in window && Notification.permission === 'default') {
+    Notification.requestPermission();
+  }
+}
+
+// ══════════════════════════════════════════════
+// PDF 解析
+// ══════════════════════════════════════════════
+if (typeof pdfjsLib !== 'undefined') {
+  pdfjsLib.GlobalWorkerOptions.workerSrc =
+    'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+}
+
+function handlePdfDrop(e) {
+  e.preventDefault();
+  document.getElementById('pdf-zone').classList.remove('drag');
+  const file = e.dataTransfer.files[0];
+  if (file && file.type === 'application/pdf') handlePdfFile(file);
+  else toast('error','請上傳 PDF 檔案');
+}
+
+async function handlePdfFile(file) {
+  if (!file) return;
+  const status = document.getElementById('pdf-status');
+  const result = document.getElementById('pdf-result');
+  status.textContent = '⏳ 讀取中…';
+  result.style.display = 'none';
+
+  try {
+    const arrayBuf = await file.arrayBuffer();
+    const pdf      = await pdfjsLib.getDocument({data: arrayBuf}).promise;
+    let fullText   = '';
+    for (let i = 1; i <= pdf.numPages; i++) {
+      const page    = await pdf.getPage(i);
+      const content = await page.getTextContent();
+      fullText     += content.items.map(item => item.str).join(' ') + '\n';
+    }
+    result.textContent   = fullText;
+    result.style.display = 'block';
+    status.textContent   = `✅ 已讀取 ${pdf.numPages} 頁｜${file.name}`;
+
+    // 解析嘗試
+    parsePdfSchedule(fullText);
+
+    // 顯示確認按鈕
+    document.getElementById('pdf-confirm-btn').style.display = 'block';
+    showBannerMsg('📄 直播標單已上傳', `${file.name} 讀取完成，請確認內容`);
+  } catch(err) {
+    status.textContent = '❌ 讀取失敗：' + err.message;
+  }
+}
+
+function parsePdfSchedule(text) {
+  // 嘗試偵測常見格式：日期、時間、主持人
+  const lines   = text.split(/\n|；|。/).map(l=>l.trim()).filter(Boolean);
+  const dateReg = /(\d{1,2})[\/.月](\d{1,2})/;
+  const timeReg = /(\d{1,2}):(\d{2})/;
+  const found   = [];
+
+  lines.forEach(line => {
+    const dm = line.match(dateReg);
+    const tm = line.match(timeReg);
+    if (dm && tm) {
+      found.push({ raw: line, month: dm[1], day: dm[2], time: `${tm[1].padStart(2,'0')}:${tm[2]}` });
+    }
+  });
+
+  const parsed = document.getElementById('pdf-parsed');
+  if (!found.length) {
+    parsed.innerHTML = `<div style="font-size:11px;color:#9c8470;padding:8px;">
+      ⚠ 無法自動辨識場次格式，請參考上方文字內容手動新增場次。</div>`;
+    return;
+  }
+
+  parsed.innerHTML = `<div style="font-size:11px;font-weight:700;color:#7c5c3a;margin-bottom:8px;">
+    📌 偵測到 ${found.length} 筆可能的場次（請確認後手動新增）：</div>`
+    + found.map(f=>`<div class="pdf-parsed-row">
+        <span style="font-size:11px;color:#9c8470;">📅 ${f.month}/${f.day}</span>
+        <span style="font-size:11px;color:#9c8470;">🕐 ${f.time}</span>
+        <span style="font-size:12px;color:#2d2520;flex:1;">${f.raw.slice(0,60)}${f.raw.length>60?'…':''}</span>
+      </div>`).join('');
+}
+
+function confirmPdfTask() {
+  setTask(taskYear, taskMonth, 'pdf_done', true);
+  document.getElementById('pdf-confirm-btn').style.display = 'none';
+  showBannerMsg('✅ 當月直播標單已完成', `${taskYear}年${taskMonth+1}月標單已確認`);
+  toast('ok','直播標單已標記完成');
+  checkAllDone();
+}
+
+// ══════════════════════════════════════════════
+// 封面圖管理
+// ══════════════════════════════════════════════
+function getCovers() {
+  try { return JSON.parse(localStorage.getItem(COVER_STORE)||'{}'); }
+  catch { return {}; }
+}
+function saveCovers(obj) { localStorage.setItem(COVER_STORE, JSON.stringify(obj)); }
+
+// 取得某場次的封面圖
+function getCoverForSession(sessionId) {
+  const covers = getCovers();
+  for (const key of Object.keys(covers)) {
+    const found = covers[key].find(c => c.sessionId === sessionId);
+    if (found) return found;
+  }
+  return null;
+}
+
+function handleCoverUpload(input, sessionId) {
+  const file = input.files[0];
+  if (!file) return;
+  if (file.size > 3*1024*1024) { toast('error','圖片請勿超過 3MB'); return; }
+  const reader = new FileReader();
+  reader.onload = e => {
+    const covers = getCovers();
+
+    // 若已有同場次封面，先移除舊的
+    for (const key of Object.keys(covers)) {
+      covers[key] = covers[key].filter(c => c.sessionId !== sessionId);
+    }
+
+    // 寫入月份 key（從 sessionId 對應場次的日期推算）
+    const s   = getAllSessions().find(s => s.id === sessionId);
+    const key = s ? s.date.slice(0,7) : getTaskKey(taskYear, taskMonth);
+    if (!covers[key]) covers[key] = [];
+    covers[key].push({
+      id:        Date.now(),
+      sessionId: sessionId,
+      name:      file.name,
+      src:       e.target.result,
+      ts:        new Date().toISOString()
+    });
+    saveCovers(covers);
+    input.value = '';
+    renderCovers();
+    renderAll(); // 更新卡片上的「封面已上傳」標籤
+
+    setTask(taskYear, taskMonth, 'cover_done', true);
+    showBannerMsg('🖼 封面圖已上傳', `${s ? s.brand + ' ' + s.date : ''} 封面已綁定`);
+    toast('ok','封面圖上傳完成');
+    checkAllDone();
+  };
+  reader.readAsDataURL(file);
+}
+
+function deleteCover(id) {
+  if (!confirm('確定刪除此封面圖？')) return;
+  const covers = getCovers();
+  const key    = getTaskKey(taskYear, taskMonth);
+  if (covers[key]) covers[key] = covers[key].filter(c=>c.id!==id);
+  saveCovers(covers);
+  renderCovers();
+}
+
+function renderCovers() {
+  const covers  = getCovers();
+  const key     = getTaskKey(taskYear, taskMonth);
+  const list    = covers[key] || [];
+  const grid    = document.getElementById('cover-grid');
+  const empty   = document.getElementById('cover-empty');
+  if (!grid) return;
+
+  if (!list.length) {
+    grid.innerHTML = '';
+    if (empty) empty.style.display = 'block';
+    return;
+  }
+  if (empty) empty.style.display = 'none';
+
+  grid.innerHTML = list.map(c => {
+    const ts  = new Date(c.ts).toLocaleDateString('zh-TW');
+    const s   = c.sessionId ? getAllSessions().find(s=>s.id===c.sessionId) : null;
+    const tag = s ? `<div style="font-size:9px;color:#7c5c3a;background:#f5ede0;border-radius:5px;padding:2px 6px;margin-top:4px;">${s.brand} ${s.date} ${s.time}</div>` : '';
+    return `<div class="cover-card">
+      <button class="cover-del-btn" onclick="deleteCover(${c.id})" title="刪除">✕</button>
+      <img class="cover-thumb" src="${c.src}" alt="${c.name}">
+      <div class="cover-label">${c.name.length>18?c.name.slice(0,18)+'…':c.name}</div>
+      ${tag}
+      <div class="cover-status">上傳：${ts}</div>
+    </div>`;
+  }).join('');
+}
+</script>
+</body>
+</html>
