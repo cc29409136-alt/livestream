@@ -117,6 +117,21 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:#f5f0e8;color:#2d252
 .ev-yht{background:#ede8f8;color:#6040a0;}
 .ev-dm{background:#e8f5e8;color:#2a6a2a;}
 
+/* ── 數據紀錄表格 ── */
+.metrics-table{width:100%;border-collapse:collapse;font-size:11px;min-width:900px;}
+.metrics-table th{background:#f5ede0;color:#7c5c3a;font-weight:700;padding:7px 8px;text-align:center;border:1px solid #e0d4c4;white-space:nowrap;}
+.metrics-table td{padding:5px 6px;border:1px solid #ede5d8;text-align:center;vertical-align:middle;}
+.metrics-table tr:nth-child(even) td{background:#faf7f2;}
+.metrics-input{width:100%;padding:4px 6px;border:1.5px solid #e0d4c4;border-radius:6px;background:#fff;color:#2d2520;font-size:11px;outline:none;text-align:right;min-width:60px;}
+.metrics-input:focus{border-color:#c4956a;}
+.metrics-calc{font-weight:700;color:#7c5c3a;}
+.metrics-roas{font-weight:800;}
+.metrics-roas.good{color:#2a6a2a;}
+.metrics-roas.bad{color:#c0503a;}
+.metrics-summary{display:flex;gap:12px;flex-wrap:wrap;margin-top:12px;padding-top:10px;border-top:1.5px solid #e8ddd0;}
+.metrics-sum-item{font-size:11px;color:#9c8470;display:flex;flex-direction:column;align-items:center;gap:2px;min-width:80px;}
+.metrics-sum-val{font-size:16px;font-weight:800;color:#7c5c3a;}
+
 /* ── Toast ── */
 #toast{position:fixed;bottom:24px;right:24px;padding:11px 20px;border-radius:12px;font-size:12px;font-weight:700;z-index:999;opacity:0;transition:opacity .2s;pointer-events:none;box-shadow:0 4px 16px #00000018;}
 #toast.show{opacity:1;}
@@ -239,6 +254,7 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:#f5f0e8;color:#2d252
     <button class="nav-btn" onclick="switchTab('calendar',this)">📅 行事曆</button>
     <button class="nav-btn" onclick="switchTab('flow',this)">📋 工作流程</button>
     <button class="nav-btn" onclick="switchTab('monthly',this)">📋 本月任務</button>
+    <button class="nav-btn" onclick="switchTab('metrics',this)">📈 數據紀錄</button>
     <button class="nav-btn" onclick="switchTab('admin',this)" style="margin-left:auto;color:#c4956a;">⚙ 管理場次</button>
   </div>
 
@@ -300,6 +316,17 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:#f5f0e8;color:#2d252
           <button onclick="shiftViewMonth(-1)" style="padding:3px 11px;border:1.5px solid #e0d4c4;border-radius:8px;background:#faf7f2;color:#7c5c3a;font-size:13px;cursor:pointer;">‹</button>
           <button onclick="shiftViewMonth(1)"  style="padding:3px 11px;border:1.5px solid #e0d4c4;border-radius:8px;background:#faf7f2;color:#7c5c3a;font-size:13px;cursor:pointer;">›</button>
         </div>
+      </div>
+      <!-- 品牌篩選 + 圖例 -->
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px;flex-wrap:wrap;">
+        <span style="font-size:11px;color:#9c8470;font-weight:600;">篩選：</span>
+        <button id="cal-filter-all" onclick="setCalFilter('all')" style="padding:4px 14px;border-radius:20px;border:1.5px solid #c4956a;background:#f5ede0;color:#7c5c3a;font-size:11px;font-weight:700;cursor:pointer;">全部</button>
+        <button id="cal-filter-yht" onclick="setCalFilter('yht')" style="padding:4px 14px;border-radius:20px;border:1.5px solid #c0b0e0;background:#ede8f8;color:#6040a0;font-size:11px;font-weight:700;cursor:pointer;">御熹堂</button>
+        <button id="cal-filter-dm"  onclick="setCalFilter('dm')"  style="padding:4px 14px;border-radius:20px;border:1.5px solid #90c890;background:#e8f5e8;color:#2a6a2a;font-size:11px;font-weight:700;cursor:pointer;">達摩本草</button>
+        <span style="margin-left:auto;display:flex;gap:10px;align-items:center;">
+          <span style="display:flex;align-items:center;gap:4px;font-size:10px;color:#6040a0;font-weight:600;"><span style="width:10px;height:10px;border-radius:3px;background:#ede8f8;border:1.5px solid #c0b0e0;display:inline-block;"></span>御熹堂</span>
+          <span style="display:flex;align-items:center;gap:4px;font-size:10px;color:#2a6a2a;font-weight:600;"><span style="width:10px;height:10px;border-radius:3px;background:#e8f5e8;border:1.5px solid #90c890;display:inline-block;"></span>達摩本草</span>
+        </span>
       </div>
       <div class="cal-grid" id="cal-grid"></div>
     </div>
@@ -384,6 +411,36 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:#f5f0e8;color:#2d252
 
       </div>
     </div>
+  </div>
+
+  <!-- ══ 數據紀錄 ══ -->
+  <div class="page" id="page-metrics">
+    <!-- 月份切換 -->
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;">
+      <button onclick="shiftMetricsMonth(-1)" style="padding:4px 13px;border:1.5px solid #e0d4c4;border-radius:8px;background:#faf7f2;color:#7c5c3a;font-size:14px;cursor:pointer;">‹</button>
+      <span id="metrics-month-label" style="font-size:16px;font-weight:800;color:#7c5c3a;"></span>
+      <button onclick="shiftMetricsMonth(1)"  style="padding:4px 13px;border:1.5px solid #e0d4c4;border-radius:8px;background:#faf7f2;color:#7c5c3a;font-size:14px;cursor:pointer;">›</button>
+    </div>
+
+    <!-- 達摩本草 -->
+    <div class="card" style="margin-bottom:16px;">
+      <div class="card-title" style="color:#2a6a2a;">🌿 達摩本草 直播數據</div>
+      <div style="overflow-x:auto;">
+        <table class="metrics-table" id="metrics-table-dm"></table>
+      </div>
+      <div id="metrics-summary-dm" class="metrics-summary"></div>
+    </div>
+
+    <!-- 御熹堂 -->
+    <div class="card">
+      <div class="card-title" style="color:#6040a0;">✨ 御熹堂 直播數據</div>
+      <div style="overflow-x:auto;">
+        <table class="metrics-table" id="metrics-table-yht"></table>
+      </div>
+      <div id="metrics-summary-yht" class="metrics-summary"></div>
+    </div>
+
+    <p style="font-size:10px;color:#b09880;margin-top:10px;text-align:center;">數據自動儲存，自動計算抽成、總費用、ROAS</p>
   </div>
 
   <!-- ══ 管理場次 ══ -->
@@ -699,6 +756,7 @@ function switchTab(id, btn) {
   document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
   document.getElementById('page-' + id).classList.add('active');
   btn.classList.add('active');
+  if (id === 'metrics') renderMetrics();
 }
 
 // ══════════════════════════════════════════════
@@ -853,16 +911,32 @@ function renderCalendar(year, month, allSessions) {
     const daySessions = allSessions.filter(s => s.date === dateStr);
     const hasEvent   = daySessions.length > 0;
     const isTod      = isToday(dateStr);
-    const evHtml     = daySessions.map(s => {
-      const cls = s.brandKey === 'yht' ? 'cal-event ev-yht' : 'cal-event ev-dm';
-      return `<div class="${cls}">${s.time} ${s.host}</div>`;
+    const filtered = calFilter === 'all' ? daySessions : daySessions.filter(s => s.brandKey === calFilter);
+    const hasEv    = filtered.length > 0;
+    const evHtml   = filtered.map(s => {
+      const cls       = s.brandKey === 'yht' ? 'cal-event ev-yht' : 'cal-event ev-dm';
+      const brandName = s.brandKey === 'yht' ? '御熹堂' : (s.brandKey === 'dm' ? '達摩本草' : s.brand);
+      return `<div class="${cls}" title="${brandName} ${s.time} ${s.host}"><b>${brandName}</b> ${s.time}</div>`;
     }).join('');
-    const cls = `cal-day${hasEvent?' has-event':''}${isTod?' today-cell':''}`;
+    const cls = `cal-day${hasEv?' has-event':''}${isTod?' today-cell':''}`;
     html += `<div class="${cls}" onclick="showCalDetail('${dateStr}')">
       <div class="cal-day-num">${d}</div>${evHtml}
     </div>`;
   }
   grid.innerHTML = html;
+}
+
+let calFilter = 'all';
+function setCalFilter(f) {
+  calFilter = f;
+  ['all','yht','dm'].forEach(k => {
+    const btn = document.getElementById('cal-filter-' + k);
+    if (!btn) return;
+    btn.style.opacity = (k === f) ? '1' : '0.45';
+    btn.style.fontWeight = (k === f) ? '800' : '600';
+  });
+  const sessions = getAllSessions();
+  renderCalendar(viewYear, viewMonth, sessions);
 }
 
 function showCalDetail(dateStr) {
@@ -1144,38 +1218,35 @@ function generateScript() {
   const activities= document.getElementById('sf-activities').value.trim();
   const notes     = document.getElementById('sf-notes').value.trim();
 
+  const prodCount = products.split('\n').filter(Boolean).length;
   const prodLines = products
-    ? products.split('\n').map((l,i) => l.startsWith('(') ? l : `(${i+1}.) ${l}`).join('\n')
+    ? products.split('\n').filter(Boolean).map((l,i) => l.match(/^\(\d+\.\)/) ? l : `(${i+1}.) ${l}`).join('\n')
     : '（請填入主推商品）';
 
-  const focusLine = focus ? `👉（重點：${focus}）` : '';
+  const productBlock = [
+    `🔥主推商品（全掛＋主推${prodCount || 0}款）`,
+    focus ? `👉（重點：${focus}）` : null,
+    prodLines
+  ].filter(Boolean).join('\n');
 
-  const actBlock = actDate && activities
-    ? `\n🎁 限時活動（指定日期變價）\n📅 ${actDate}\n${activities.split('\n').map(l=>l.startsWith('⠂')?l:`⠂${l}`).join('\n')}\n\n(放 "限時活動圖" 後)\n‼️留意：今日>會有「限時活動喔」如上述圖示`
+  const actLines = activities
+    ? activities.split('\n').filter(Boolean).map(l => l.startsWith('⠂') ? l : `⠂${l}`).join('\n')
     : '';
 
-  const notesBlock = notes ? `\n\n📌 ${notes}` : '';
+  const actBlock = actDate && actLines
+    ? `🎁 限時活動（指定日期變價）\n📅 ${actDate}\n${actLines}\n\n(放 "限時活動圖" 後)\n‼️留意：今日>會有「限時活動喔」如上述圖示`
+    : '';
 
-  const script = `🎙️ ${host}｜${time}｜${brand}
-━━━━━━━━━━━━━━━━
-⠂發佈「預告限動」
-⠂Tag IG：${ig}
-⠂放上蝦皮連結🔗
-${shopee}
+  const parts = [
+    `🎙️ ${host}｜${time}｜${brand}\n━━━━━━━━━━━━━━━━\n⠂發佈「預告限動」\n⠂Tag IG：${ig}\n⠂放上蝦皮連結🔗\n${shopee}`,
+    `🔐 直播登入資訊\n⠂帳號：${acc}\n⠂密碼：${pw}`,
+    productBlock,
+    actBlock,
+    `‼️記得!!!!!Push觀眾 "加入品牌會員"\n👉會不定期的發會員券跟累積點數可以換商品。`,
+    notes ? `📌 ${notes}` : null,
+  ].filter(Boolean);
 
-🔐 直播登入資訊
-⠂帳號：${acc}
-⠂密碼：${pw}
-
-🔥主推商品（全掛＋主推${products.split('\n').filter(Boolean).length}款）
-${focusLine}
-${prodLines}
-${actBlock}
-
-‼️記得!!!!!Push觀眾 "加入品牌會員"
-👉會不定期的發會員券跟累積點數可以換商品。${notesBlock}`;
-
-  document.getElementById('script-output').value = script;
+  document.getElementById('script-output').value = parts.join('\n\n');
 }
 
 function copyScript() {
@@ -1550,6 +1621,145 @@ function deleteCover(id) {
   if (covers[key]) covers[key] = covers[key].filter(c=>c.id!==id);
   saveCovers(covers);
   renderCovers();
+}
+
+// ══════════════════════════════════════════════
+// 數據紀錄
+// ══════════════════════════════════════════════
+const METRICS_STORE = 'ls_metrics_v1';
+let metricsYear = viewYear, metricsMonth = viewMonth;
+
+function getMetrics() {
+  try { return JSON.parse(localStorage.getItem(METRICS_STORE)) || {}; } catch{ return {}; }
+}
+function saveMetrics(data) {
+  localStorage.setItem(METRICS_STORE, JSON.stringify(data));
+}
+function getMetricKey(sessionId) { return sessionId; }
+
+function updateMetricField(sessionId, field, value) {
+  const data = getMetrics();
+  if (!data[sessionId]) data[sessionId] = {};
+  data[sessionId][field] = value;
+  // auto-calc
+  const m    = data[sessionId];
+  const fee  = parseFloat((m.fee || '').toString().replace(/,/g,'')) || 0;
+  const sales = parseFloat((m.sales || '').toString().replace(/,/g,'')) || 0;
+  const hasCommission = (m.hasCommission === true || m.hasCommission === 'true');
+  const commission = hasCommission ? Math.round(sales * 0.1) : 0;
+  m.commission = commission;
+  m.totalFee   = fee + commission;
+  m.roas       = m.totalFee > 0 ? (sales / m.totalFee).toFixed(2) : '';
+  saveMetrics(data);
+  renderMetricsRow(sessionId);
+  renderMetricsSummary();
+}
+
+function renderMetricsRow(sessionId) {
+  const row = document.getElementById('mrow-' + sessionId);
+  if (!row) return;
+  const data = getMetrics();
+  const m    = data[sessionId] || {};
+  const commission = m.commission || 0;
+  const totalFee   = m.totalFee   || 0;
+  const roas       = parseFloat(m.roas) || 0;
+  const roasCls    = roas >= 3 ? 'good' : roas > 0 ? 'bad' : '';
+  row.querySelector('.td-commission').textContent = commission ? commission.toLocaleString() : '—';
+  row.querySelector('.td-totalfee').textContent   = totalFee   ? totalFee.toLocaleString()   : '—';
+  row.querySelector('.td-roas').textContent        = roas       ? roas                         : '—';
+  row.querySelector('.td-roas').className = 'metrics-roas ' + roasCls;
+}
+
+function renderMetricsTable(brandKey, tableId) {
+  const sessions = getAllSessions().filter(s => {
+    const ym = `${metricsYear}-${String(metricsMonth+1).padStart(2,'0')}`;
+    return s.brandKey === brandKey && s.date.startsWith(ym);
+  }).sort((a,b) => a.date.localeCompare(b.date) || a.time.localeCompare(b.time));
+
+  const table = document.getElementById(tableId);
+  if (!table) return;
+
+  const hasCommissionBrand = brandKey === 'yht';
+
+  const headers = ['開播日期','開播時間','直播主','直播主費用','觀看次數','觀眾數','平均觀看時間','蝦幣使用狀況','銷售額(可出貨)','可出貨訂單數','主持人10%抽成','總費用','ROAS'];
+  const headRow = `<thead><tr>${headers.map(h=>`<th>${h}</th>`).join('')}</tr></thead>`;
+
+  const data = getMetrics();
+  const bodyRows = sessions.map(s => {
+    const m   = data[s.id] || {};
+    const commission = m.commission || 0;
+    const totalFee   = m.totalFee   || 0;
+    const roas       = parseFloat(m.roas) || 0;
+    const roasCls    = roas >= 3 ? 'good' : roas > 0 ? 'bad' : '';
+    const feeDisplay = s.fee || (hasCommissionBrand ? '1,000' : '4,000');
+    // store default fee if not yet set
+    if (!m.fee) {
+      if (!data[s.id]) data[s.id] = {};
+      data[s.id].fee = parseFloat(feeDisplay.replace(/,/g,''));
+      data[s.id].hasCommission = hasCommissionBrand;
+    }
+    return `<tr id="mrow-${s.id}">
+      <td>${s.date}</td>
+      <td>${s.time}</td>
+      <td style="font-weight:700;">${s.host}</td>
+      <td><input class="metrics-input" style="width:80px;" value="${feeDisplay}" onchange="updateMetricField('${s.id}','fee',this.value.replace(/,/g,''))" onblur="updateMetricField('${s.id}','fee',this.value.replace(/,/g,''))"></td>
+      <td><input class="metrics-input" placeholder="—" value="${m.views||''}" onblur="updateMetricField('${s.id}','views',this.value)"></td>
+      <td><input class="metrics-input" placeholder="—" value="${m.audience||''}" onblur="updateMetricField('${s.id}','audience',this.value)"></td>
+      <td><input class="metrics-input" placeholder="—分鐘" value="${m.avgTime||''}" onblur="updateMetricField('${s.id}','avgTime',this.value)"></td>
+      <td><input class="metrics-input" placeholder="—" value="${m.shrimp||''}" onblur="updateMetricField('${s.id}','shrimp',this.value)"></td>
+      <td><input class="metrics-input" placeholder="0" value="${m.sales||''}" onblur="updateMetricField('${s.id}','sales',this.value.replace(/,/g,''))"></td>
+      <td><input class="metrics-input" placeholder="0" value="${m.orders||''}" onblur="updateMetricField('${s.id}','orders',this.value)"></td>
+      <td class="td-commission metrics-calc">${commission ? commission.toLocaleString() : '—'}</td>
+      <td class="td-totalfee metrics-calc">${totalFee ? totalFee.toLocaleString() : '—'}</td>
+      <td class="td-roas metrics-roas ${roasCls}">${roas || '—'}</td>
+    </tr>`;
+  }).join('');
+
+  saveMetrics(data);
+  table.innerHTML = sessions.length
+    ? headRow + `<tbody>${bodyRows}</tbody>`
+    : headRow + `<tbody><tr><td colspan="13" style="color:#b09880;padding:20px;">本月尚無場次</td></tr></tbody>`;
+}
+
+function renderMetricsSummary() {
+  ['dm','yht'].forEach(bk => {
+    const sessions = getAllSessions().filter(s => {
+      const ym = `${metricsYear}-${String(metricsMonth+1).padStart(2,'0')}`;
+      return s.brandKey === bk && s.date.startsWith(ym);
+    });
+    const data = getMetrics();
+    let totalSales = 0, totalFee = 0, sessions_ = 0;
+    sessions.forEach(s => {
+      const m = data[s.id] || {};
+      totalSales += parseFloat((m.sales||'0').toString().replace(/,/g,'')) || 0;
+      totalFee   += m.totalFee || 0;
+      if (m.sales) sessions_++;
+    });
+    const roas = totalFee > 0 ? (totalSales / totalFee).toFixed(2) : '—';
+    const el = document.getElementById('metrics-summary-' + bk);
+    if (!el) return;
+    el.innerHTML = `
+      <div class="metrics-sum-item"><span class="metrics-sum-val">${sessions.length}</span>場次總數</div>
+      <div class="metrics-sum-item"><span class="metrics-sum-val">${sessions_}</span>已填數據</div>
+      <div class="metrics-sum-item"><span class="metrics-sum-val">${totalSales ? totalSales.toLocaleString() : '—'}</span>總銷售額</div>
+      <div class="metrics-sum-item"><span class="metrics-sum-val">${totalFee ? totalFee.toLocaleString() : '—'}</span>總費用</div>
+      <div class="metrics-sum-item"><span class="metrics-sum-val" style="color:${parseFloat(roas)>=3?'#2a6a2a':parseFloat(roas)>0?'#c0503a':'#7c5c3a'}">${roas}</span>整體ROAS</div>`;
+  });
+}
+
+function renderMetrics() {
+  const label = document.getElementById('metrics-month-label');
+  if (label) label.textContent = `${metricsYear}年${metricsMonth+1}月`;
+  renderMetricsTable('dm',  'metrics-table-dm');
+  renderMetricsTable('yht', 'metrics-table-yht');
+  renderMetricsSummary();
+}
+
+function shiftMetricsMonth(dir) {
+  metricsMonth += dir;
+  if (metricsMonth > 11) { metricsMonth = 0; metricsYear++; }
+  if (metricsMonth < 0)  { metricsMonth = 11; metricsYear--; }
+  renderMetrics();
 }
 
 function renderCovers() {
