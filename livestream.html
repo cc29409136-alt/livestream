@@ -494,6 +494,28 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:#f5f0e8;color:#2d252
   <!-- ══ 管理場次 ══ -->
   <div class="page" id="page-admin">
 
+    <!-- PDF 匯入檔期 -->
+    <div class="card" style="border-color:#c0b0e0;background:#faf8ff;margin-bottom:14px;">
+      <div class="card-title" style="color:#6040a0;">📄 從 PDF 匯入每月直播檔期</div>
+      <p style="font-size:11px;color:#9c8470;margin-bottom:12px;">上傳品牌直播標單 PDF，系統自動辨識場次並新增至行事曆。</p>
+      <div class="upload-zone" id="schedule-pdf-zone"
+        ondragover="event.preventDefault();this.classList.add('drag')"
+        ondragleave="this.classList.remove('drag')"
+        ondrop="this.classList.remove('drag');handleSchedulePdf(event.dataTransfer.files[0])">
+        <input type="file" accept=".pdf" onchange="handleSchedulePdf(this.files[0])" style="position:absolute;inset:0;opacity:0;cursor:pointer;">
+        <div class="upload-zone-label">📅 拖放直播檔期 PDF 或點擊上傳</div>
+      </div>
+      <div id="schedule-pdf-status" style="font-size:11px;color:#9c8470;margin-top:8px;min-height:16px;"></div>
+      <div id="schedule-pdf-preview" style="margin-top:10px;display:none;">
+        <div style="font-size:12px;font-weight:700;color:#7c5c3a;margin-bottom:8px;">📋 偵測到以下場次（確認後批次新增）</div>
+        <div id="schedule-pdf-rows"></div>
+        <div style="display:flex;gap:8px;margin-top:10px;">
+          <button onclick="importSchedulePdf()" style="flex:1;padding:10px;background:#6040a0;color:#fff;border:none;border-radius:9px;font-size:13px;font-weight:700;cursor:pointer;">✅ 全部新增至行事曆</button>
+          <button onclick="document.getElementById('schedule-pdf-preview').style.display='none'" style="padding:10px 18px;background:#f5ede0;border:1px solid #e0d4c4;border-radius:9px;font-size:12px;color:#7c5c3a;cursor:pointer;">取消</button>
+        </div>
+      </div>
+    </div>
+
     <!-- 新增場次表單 -->
     <div class="card" style="border-color:#e0ccb0;background:#fffdf8;">
       <div class="card-title">➕ 新增直播場次</div>
@@ -633,15 +655,15 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:#f5f0e8;color:#2d252
 // ══════════════════════════════════════════════
 const SESSIONS_STORE = 'ls_sessions_v1';
 const DEFAULT_SESSIONS = [
-  { id:'s1',  brand:'御熹堂',  brandKey:'yht', date:'2025-07-06', time:'23:30', host:'年年' },
-  { id:'s2',  brand:'御熹堂',  brandKey:'yht', date:'2025-07-07', time:'20:00', host:'年年' },
-  { id:'s3',  brand:'達摩本草', brandKey:'dm',  date:'2025-07-06', time:'23:30', host:'子葳' },
-  { id:'s4',  brand:'達摩本草', brandKey:'dm',  date:'2025-07-07', time:'20:00', host:'巧玉' },
-  { id:'s5',  brand:'達摩本草', brandKey:'dm',  date:'2025-07-07', time:'22:00', host:'嘉恩' },
-  { id:'s6',  brand:'達摩本草', brandKey:'dm',  date:'2025-07-17', time:'23:30', host:'Sunny' },
-  { id:'s7',  brand:'達摩本草', brandKey:'dm',  date:'2025-07-18', time:'12:00', host:'年年' },
-  { id:'s8',  brand:'達摩本草', brandKey:'dm',  date:'2025-07-18', time:'20:00', host:'巧玉' },
-  { id:'s9',  brand:'達摩本草', brandKey:'dm',  date:'2025-07-25', time:'20:00', host:'傑評' },
+  { id:'s1',  brand:'御熹堂',  brandKey:'yht', date:'2025-07-06', time:'23:30', host:'年年',  fee:1000 },
+  { id:'s2',  brand:'御熹堂',  brandKey:'yht', date:'2025-07-07', time:'20:00', host:'年年',  fee:1000 },
+  { id:'s3',  brand:'達摩本草', brandKey:'dm',  date:'2025-07-06', time:'23:30', host:'子葳',  fee:4000 },
+  { id:'s4',  brand:'達摩本草', brandKey:'dm',  date:'2025-07-07', time:'20:00', host:'巧玉',  fee:4000 },
+  { id:'s5',  brand:'達摩本草', brandKey:'dm',  date:'2025-07-07', time:'22:00', host:'嘉恩',  fee:4000 },
+  { id:'s6',  brand:'達摩本草', brandKey:'dm',  date:'2025-07-17', time:'23:30', host:'Sunny', fee:5000 },
+  { id:'s7',  brand:'達摩本草', brandKey:'dm',  date:'2025-07-18', time:'12:00', host:'年年',  fee:4000 },
+  { id:'s8',  brand:'達摩本草', brandKey:'dm',  date:'2025-07-18', time:'20:00', host:'巧玉',  fee:4000 },
+  { id:'s9',  brand:'達摩本草', brandKey:'dm',  date:'2025-07-25', time:'20:00', host:'傑評',  fee:4000 },
 ];
 
 function getAllSessions() {
@@ -1596,6 +1618,143 @@ function parsePdfSchedule(text) {
         <span style="font-size:11px;color:#9c8470;">🕐 ${f.time}</span>
         <span style="font-size:12px;color:#2d2520;flex:1;">${f.raw.slice(0,60)}${f.raw.length>60?'…':''}</span>
       </div>`).join('');
+}
+
+// ══════════════════════════════════════════════
+// 檔期 PDF 匯入（管理場次用）
+// ══════════════════════════════════════════════
+let parsedScheduleSessions = [];
+
+async function handleSchedulePdf(file) {
+  if (!file || file.type !== 'application/pdf') { toast('error','請上傳 PDF 檔案'); return; }
+  const status  = document.getElementById('schedule-pdf-status');
+  const preview = document.getElementById('schedule-pdf-preview');
+  status.textContent = '⏳ 讀取中…';
+  preview.style.display = 'none';
+  try {
+    const arrayBuf = await file.arrayBuffer();
+    const pdf      = await pdfjsLib.getDocument({data: arrayBuf}).promise;
+    let fullText = '';
+    for (let i = 1; i <= pdf.numPages; i++) {
+      const page    = await pdf.getPage(i);
+      const content = await page.getTextContent();
+      // 保留位置資訊以利逐行解析
+      fullText += content.items.map(it => it.str).join(' ') + '\n';
+    }
+    status.textContent = `✅ 已讀取 ${pdf.numPages} 頁｜${file.name}`;
+    parseScheduleText(fullText);
+  } catch(err) {
+    status.textContent = '❌ 讀取失敗：' + err.message;
+  }
+}
+
+function parseScheduleText(text) {
+  parsedScheduleSessions = [];
+  const lines = text.split(/\n/).map(l => l.trim()).filter(Boolean);
+
+  // 品牌關鍵字對應
+  const brandMap = [
+    { key:'yht', name:'御熹堂',  keywords:['御熹堂','御熙堂','yuhsi','yht'] },
+    { key:'dm',  name:'達摩本草', keywords:['達摩','本草','damo','damokampo','dm'] },
+  ];
+
+  const dateReg  = /(\d{1,2})[\/\.\-月](\d{1,2})/;
+  const timeReg  = /(\d{1,2}):(\d{2})/;
+  const feeReg   = /[\$＄]?\s*([\d,，]+)\s*[元圓]?/;
+
+  // 偵測目前讀到的品牌（依段落）
+  let currentBrand = null, currentBrandKey = null;
+
+  lines.forEach(line => {
+    const lLow = line.toLowerCase();
+    // 更新當前品牌
+    for (const b of brandMap) {
+      if (b.keywords.some(k => lLow.includes(k))) {
+        currentBrand = b.name; currentBrandKey = b.key;
+      }
+    }
+
+    const dm = line.match(dateReg);
+    const tm = line.match(timeReg);
+    if (!dm || !tm) return;
+
+    const month = dm[1].padStart(2,'0');
+    const day   = dm[2].padStart(2,'0');
+    const time  = `${tm[1].padStart(2,'0')}:${tm[2]}`;
+
+    // 嘗試抓主持人（中文姓名 2-4 字，或英文名）
+    const hostMatch = line.match(/[一-龥]{2,4}|[A-Za-z]{3,10}/g) || [];
+    // 過濾掉品牌關鍵字
+    const ignoreWords = ['達摩','本草','御熹','御熙','直播','場次','月份','品牌','開播','主持'];
+    const host = hostMatch.find(h => !ignoreWords.some(ig => h.includes(ig))) || '待確認';
+
+    // 費用
+    const feeMatch = line.match(feeReg);
+    const fee = feeMatch ? parseInt(feeMatch[1].replace(/[,，]/g,'')) : 0;
+
+    // 推測年份（若月份 >= 當月-1 用今年，否則下一年）
+    const now = new Date();
+    let year = now.getFullYear();
+    if (parseInt(month) < now.getMonth()) year++;
+
+    parsedScheduleSessions.push({
+      brand: currentBrand || '待確認',
+      brandKey: currentBrandKey || 'custom',
+      date: `${year}-${month}-${day}`,
+      time, host, fee,
+      _raw: line.slice(0,60)
+    });
+  });
+
+  const rows = document.getElementById('schedule-pdf-rows');
+  if (!parsedScheduleSessions.length) {
+    rows.innerHTML = `<div style="color:#b09880;font-size:12px;padding:10px;">⚠ 無法自動辨識場次，請手動新增或調整 PDF 格式。</div>`;
+  } else {
+    rows.innerHTML = parsedScheduleSessions.map((s,i) => `
+      <div class="adm-row" style="flex-wrap:wrap;gap:6px;">
+        <select onchange="parsedScheduleSessions[${i}].brandKey=this.value.split('|')[1];parsedScheduleSessions[${i}].brand=this.value.split('|')[0];"
+          style="padding:4px 8px;border:1.5px solid #e0d4c4;border-radius:7px;font-size:11px;background:#fff;">
+          <option value="御熹堂|yht" ${s.brandKey==='yht'?'selected':''}>御熹堂</option>
+          <option value="達摩本草|dm" ${s.brandKey==='dm'?'selected':''}>達摩本草</option>
+          <option value="${s.brand}|custom" ${s.brandKey==='custom'?'selected':''}>其他</option>
+        </select>
+        <input value="${s.date}" onchange="parsedScheduleSessions[${i}].date=this.value"
+          type="date" style="padding:4px 8px;border:1.5px solid #e0d4c4;border-radius:7px;font-size:11px;">
+        <input value="${s.time}" onchange="parsedScheduleSessions[${i}].time=this.value"
+          type="time" style="padding:4px 8px;border:1.5px solid #e0d4c4;border-radius:7px;font-size:11px;">
+        <input value="${s.host}" onchange="parsedScheduleSessions[${i}].host=this.value"
+          placeholder="主持人" style="padding:4px 8px;border:1.5px solid #e0d4c4;border-radius:7px;font-size:11px;width:80px;">
+        <input value="${s.fee||''}" onchange="parsedScheduleSessions[${i}].fee=parseInt(this.value)||0"
+          placeholder="費用" type="number" style="padding:4px 8px;border:1.5px solid #e0d4c4;border-radius:7px;font-size:11px;width:70px;">
+        <button onclick="parsedScheduleSessions.splice(${i},1);parseScheduleText('')"
+          style="padding:3px 9px;border:1px solid #e0c8c0;border-radius:6px;background:#fff5f5;color:#c0503a;font-size:11px;cursor:pointer;">✕</button>
+      </div>`).join('');
+  }
+  document.getElementById('schedule-pdf-preview').style.display = 'block';
+}
+
+function importSchedulePdf() {
+  if (!parsedScheduleSessions.length) { toast('warn','沒有可匯入的場次'); return; }
+  const existing = getAllSessions();
+  const existKeys = new Set(existing.map(s => `${s.date}_${s.time}_${s.brand}`));
+  let added = 0;
+  parsedScheduleSessions.forEach(s => {
+    const key = `${s.date}_${s.time}_${s.brand}`;
+    if (existKeys.has(key)) return; // 避免重複
+    existing.push({
+      id: 's' + Date.now() + Math.random().toString(36).slice(2,6),
+      brand: s.brand, brandKey: s.brandKey,
+      date: s.date, time: s.time, host: s.host, fee: s.fee || 0
+    });
+    existKeys.add(key);
+    added++;
+  });
+  saveAllSessions(existing);
+  parsedScheduleSessions = [];
+  document.getElementById('schedule-pdf-preview').style.display = 'none';
+  document.getElementById('schedule-pdf-status').textContent = `✅ 已新增 ${added} 場次`;
+  renderAll();
+  toast('ok', `成功匯入 ${added} 場次至行事曆！`);
 }
 
 // ══════════════════════════════════════════════
