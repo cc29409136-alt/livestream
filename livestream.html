@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="zh-TW">
 <head>
 <meta charset="UTF-8">
@@ -1693,62 +1693,75 @@ function parseScheduleText(text) {
   if (!text) { renderSchedulePreview(); return; }
 
   const brandMap = [
-    { key:'yht', name:'御熹堂',  kw:['御熹堂','御熙堂','yuhsi','yht'] },
-    { key:'dm',  name:'達摩本草', kw:['達摩本草','達摩','本草','damo','damokampo'] },
+    { key:'yht', name:'御熹堂',  kw:['御熹堂','御熙堂'] },
+    { key:'dm',  name:'達摩本草', kw:['達摩本草','達摩','本草'] },
   ];
-  const ignoreWords = ['達摩本草','達摩','本草','御熹堂','御熙堂','直播','場次','月份',
-                       '品牌','開播','主持','時間','日期','抽成','費用','標單','合作'];
-
-  const dateReg = /(\d{1,2})[\/\-月](\d{1,2})/;
-  const timeReg = /(\d{1,2}):(\d{2})/;
-  const feeReg  = /(\d{1,3}(?:[,，]\d{3})*|\d+)\s*(?:元|圓)?/g;
-
+  const skipWords = new Set(['品牌','開播','直播主','主持人','時間','日期','抽成',
+    '費用','標單','合作','場次','月份','備註','說明','開始']);
+  const brandAllKw = brandMap.flatMap(b => b.kw);
+  const nameReg = /^[一-龥]{1,5}$|^[A-Za-z]{2,12}$/;
   const now = new Date();
+
+  // 把整份文字拆成 token
+  const tokens = text
+    .replace(/\r/g,'')
+    .split(/[\s\t\n,，、。；;|｜]+/)
+    .map(t => t.trim())
+    .filter(t => t.length > 0);
+
   let currentBrand = null, currentBrandKey = null;
-  const lines = text.split(/\n/).map(l => l.trim()).filter(Boolean);
 
-  lines.forEach(line => {
-    const lLow = line.toLowerCase();
+  for (let i = 0; i < tokens.length; i++) {
+    const t = tokens[i];
 
-    const dm = line.match(dateReg);
-    const tm = line.match(timeReg);
-    if (!dm || !tm) return;
-
-    const month = dm[1].padStart(2,'0');
-    const day   = dm[2].padStart(2,'0');
-    const time  = `${tm[1].padStart(2,'0')}:${tm[2]}`;
-
-    // 每行優先從本行偵測品牌，找不到才沿用上一行
-    let lineBrand = null, lineBrandKey = null;
+    // 更新當前品牌
     for (const b of brandMap) {
-      if (b.kw.some(k => lLow.includes(k.toLowerCase()))) {
-        lineBrand = b.name; lineBrandKey = b.key;
+      if (b.kw.some(k => t.includes(k) || k.includes(t))) {
         currentBrand = b.name; currentBrandKey = b.key;
-        break;
       }
     }
-    const rowBrand    = lineBrand    || currentBrand    || '待確認';
-    const rowBrandKey = lineBrandKey || currentBrandKey || 'custom';
 
-    // 移除已知元素後，剩下的中文詞就是主持人
-    let stripped = line
-      .replace(dateReg, ' ')
-      .replace(timeReg, ' ')
-      .replace(/[\d,，$＄元圓%（）()（）\-\/\.]+/g, ' ');
+    // 找到時間 token（格式 HH:MM）
+    const tm = t.match(/^(\d{1,2}):(\d{2})$/);
+    if (!tm) continue;
+    const time = `${tm[1].padStart(2,'0')}:${tm[2]}`;
 
-    // 移除品牌詞和忽略詞
-    ignoreWords.forEach(w => { stripped = stripped.replace(new RegExp(w,'g'), ' '); });
+    // 往前最多 5 個 token 找日期
+    let month = null, day = null;
+    for (let j = i - 1; j >= Math.max(0, i - 5); j--) {
+      const dm = tokens[j].match(/^(\d{1,2})[\/\-](\d{1,2})$/);
+      if (dm) { month = dm[1].padStart(2,'0'); day = dm[2].padStart(2,'0'); break; }
+    }
+    if (!month) continue;
 
-    // 抓剩餘中文段（2-4字）或英文名
-    const candidates = [...stripped.matchAll(/[^\s -@[-`{-¿]{2,5}|[A-Za-z]{2,12}/g)]
-      .map(m => m[0].trim()).filter(Boolean);
+    // 往前最多 6 個 token 找品牌
+    let rowBrand = currentBrand || '待確認';
+    let rowBrandKey = currentBrandKey || 'custom';
+    for (let j = i - 1; j >= Math.max(0, i - 6); j--) {
+      for (const b of brandMap) {
+        if (b.kw.some(k => tokens[j].includes(k))) {
+          rowBrand = b.name; rowBrandKey = b.key;
+        }
+      }
+    }
 
-    const host = candidates[0] || '待確認';
+    // 往後最多 4 個 token 找主持人姓名
+    let host = '待確認';
+    for (let j = i + 1; j <= Math.min(tokens.length - 1, i + 4); j++) {
+      const tk = tokens[j];
+      if (/^\d/.test(tk)) continue;
+      if (brandAllKw.some(k => tk.includes(k))) continue;
+      if (skipWords.has(tk)) continue;
+      if (tk.match(/^\d{1,2}[\/\-]\d{1,2}$/) || tk.match(/^\d{1,2}:\d{2}$/)) break;
+      if (nameReg.test(tk)) { host = tk; break; }
+    }
 
-    // 費用：找合理範圍數字（500~50000），避免把日期當費用
-    const nums = [...line.matchAll(feeReg)].map(mx => parseInt(mx[1].replace(/[,，]/g,'')))
-      .filter(n => n >= 500 && n <= 50000);
-    const fee = nums[nums.length - 1] || 0;
+    // 費用：往後找合理數字
+    let fee = 0;
+    for (let j = i + 1; j <= Math.min(tokens.length - 1, i + 5); j++) {
+      const n = parseInt(tokens[j].replace(/[,，]/g,''));
+      if (!isNaN(n) && n >= 500 && n <= 50000) { fee = n; break; }
+    }
 
     // 推測年份
     let year = now.getFullYear();
@@ -1756,15 +1769,15 @@ function parseScheduleText(text) {
     if (mo < cur - 1) year++;
 
     parsedScheduleSessions.push({
-      brand: rowBrand,
-      brandKey: rowBrandKey,
+      brand: rowBrand, brandKey: rowBrandKey,
       date: `${year}-${month}-${day}`,
       time, host, fee
     });
-  });
+  }
 
   renderSchedulePreview();
 }
+
 
 function renderSchedulePreview() {
 
