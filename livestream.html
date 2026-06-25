@@ -1690,29 +1690,25 @@ async function handleScheduleFile(file) {
 
 function parseScheduleText(text) {
   parsedScheduleSessions = [];
-  const lines = text.split(/\n/).map(l => l.trim()).filter(Boolean);
+  if (!text) { renderSchedulePreview(); return; }
 
-  // 品牌關鍵字對應
   const brandMap = [
-    { key:'yht', name:'御熹堂',  keywords:['御熹堂','御熙堂','yuhsi','yht'] },
-    { key:'dm',  name:'達摩本草', keywords:['達摩','本草','damo','damokampo','dm'] },
+    { key:'yht', name:'御熹堂',  kw:['御熹堂','御熙堂','yuhsi','yht'] },
+    { key:'dm',  name:'達摩本草', kw:['達摩本草','達摩','本草','damo','damokampo'] },
   ];
+  const ignoreWords = ['達摩本草','達摩','本草','御熹堂','御熙堂','直播','場次','月份',
+                       '品牌','開播','主持','時間','日期','抽成','費用','標單','合作'];
 
-  const dateReg  = /(\d{1,2})[\/\.\-月](\d{1,2})/;
-  const timeReg  = /(\d{1,2}):(\d{2})/;
-  const feeReg   = /[\$＄]?\s*([\d,，]+)\s*[元圓]?/;
+  const dateReg = /(\d{1,2})[\/\-月](\d{1,2})/;
+  const timeReg = /(\d{1,2}):(\d{2})/;
+  const feeReg  = /(\d{1,3}(?:[,，]\d{3})*|\d+)\s*(?:元|圓)?/g;
 
-  // 偵測目前讀到的品牌（依段落）
+  const now = new Date();
   let currentBrand = null, currentBrandKey = null;
+  const lines = text.split(/\n/).map(l => l.trim()).filter(Boolean);
 
   lines.forEach(line => {
     const lLow = line.toLowerCase();
-    // 更新當前品牌
-    for (const b of brandMap) {
-      if (b.keywords.some(k => lLow.includes(k))) {
-        currentBrand = b.name; currentBrandKey = b.key;
-      }
-    }
 
     const dm = line.match(dateReg);
     const tm = line.match(timeReg);
@@ -1722,29 +1718,55 @@ function parseScheduleText(text) {
     const day   = dm[2].padStart(2,'0');
     const time  = `${tm[1].padStart(2,'0')}:${tm[2]}`;
 
-    // 嘗試抓主持人（中文姓名 2-4 字，或英文名）
-    const hostMatch = line.match(/[一-龥]{2,4}|[A-Za-z]{3,10}/g) || [];
-    // 過濾掉品牌關鍵字
-    const ignoreWords = ['達摩','本草','御熹','御熙','直播','場次','月份','品牌','開播','主持'];
-    const host = hostMatch.find(h => !ignoreWords.some(ig => h.includes(ig))) || '待確認';
+    // 每行優先從本行偵測品牌，找不到才沿用上一行
+    let lineBrand = null, lineBrandKey = null;
+    for (const b of brandMap) {
+      if (b.kw.some(k => lLow.includes(k.toLowerCase()))) {
+        lineBrand = b.name; lineBrandKey = b.key;
+        currentBrand = b.name; currentBrandKey = b.key;
+        break;
+      }
+    }
+    const rowBrand    = lineBrand    || currentBrand    || '待確認';
+    const rowBrandKey = lineBrandKey || currentBrandKey || 'custom';
 
-    // 費用
-    const feeMatch = line.match(feeReg);
-    const fee = feeMatch ? parseInt(feeMatch[1].replace(/[,，]/g,'')) : 0;
+    // 移除已知元素後，剩下的中文詞就是主持人
+    let stripped = line
+      .replace(dateReg, ' ')
+      .replace(timeReg, ' ')
+      .replace(/[\d,，$＄元圓%（）()（）\-\/\.]+/g, ' ');
 
-    // 推測年份（若月份 >= 當月-1 用今年，否則下一年）
-    const now = new Date();
+    // 移除品牌詞和忽略詞
+    ignoreWords.forEach(w => { stripped = stripped.replace(new RegExp(w,'g'), ' '); });
+
+    // 抓剩餘中文段（2-4字）或英文名
+    const candidates = [...stripped.matchAll(/[^\s -@[-`{-¿]{2,5}|[A-Za-z]{2,12}/g)]
+      .map(m => m[0].trim()).filter(Boolean);
+
+    const host = candidates[0] || '待確認';
+
+    // 費用：找合理範圍數字（500~50000），避免把日期當費用
+    const nums = [...line.matchAll(feeReg)].map(mx => parseInt(mx[1].replace(/[,，]/g,'')))
+      .filter(n => n >= 500 && n <= 50000);
+    const fee = nums[nums.length - 1] || 0;
+
+    // 推測年份
     let year = now.getFullYear();
-    if (parseInt(month) < now.getMonth()) year++;
+    const mo = parseInt(month), cur = now.getMonth() + 1;
+    if (mo < cur - 1) year++;
 
     parsedScheduleSessions.push({
-      brand: currentBrand || '待確認',
-      brandKey: currentBrandKey || 'custom',
+      brand: rowBrand,
+      brandKey: rowBrandKey,
       date: `${year}-${month}-${day}`,
-      time, host, fee,
-      _raw: line.slice(0,60)
+      time, host, fee
     });
   });
+
+  renderSchedulePreview();
+}
+
+function renderSchedulePreview() {
 
   const rows = document.getElementById('schedule-pdf-rows');
   if (!parsedScheduleSessions.length) {
